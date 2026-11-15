@@ -156,6 +156,10 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .bosspick button img{width:52px;height:52px;border-radius:6px}
 .bosspick button span{font-size:11px;line-height:1.2;text-align:center;word-break:break-all}
 .bosspick button i{position:absolute;top:3px;right:3px;font-style:normal;font-size:10px;background:#ff9a9a;color:#111;border-radius:3px;padding:0 3px}
+.verdict{margin:6px 0;padding:8px 10px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid var(--line)}
+.verdict.ok{background:rgba(8,216,165,.12);border-color:rgba(8,216,165,.5)}
+.verdict.warn{background:rgba(249,169,15,.12);border-color:rgba(249,169,15,.5)}
+.verdict.bad{background:rgba(230,102,102,.13);border-color:rgba(230,102,102,.55)}
 #dpsTable img,#bossBox table img{width:24px;height:24px;border-radius:4px;vertical-align:middle;margin-right:4px}
 .rules h3{font-size:14px;margin:14px 0 6px;color:var(--accent)}
 .rules li{margin:3px 0}
@@ -328,7 +332,7 @@ const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 
 
 /* ---------------- state ---------------- */
 const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
-const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600};
+const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
 function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}}; }
 let S = emptyLineup();
 let selected = null; // {zone, idx}
@@ -627,21 +631,21 @@ function renderDps(state){
 
 // ===== 领袖击杀模拟 =====
 const fmtT = t => t >= 60 ? `${Math.floor(t/60)}分${(t%60).toFixed(1)}秒` : `${t.toFixed(1)}秒`;
-function bossSim(state){
+function bossSim(state, scale = 1, capOverride){
   const bs = S.boss, B = BOSSES.list.find(b => b.name === bs.name); if (!B) return null;
   const hpArr = B.hp[bs.mode] || [];
   const hidden = !!(bs.hidden && hpArr.length > 1);
   const HP = hidden ? hpArr[1] : hpArr[0];
   const def0 = bs.def !== "" && bs.def != null ? +bs.def : (hidden ? B.hdef : B.def);
   const res0 = bs.res !== "" && bs.res != null ? +bs.res : (hidden ? B.hres : B.res);
-  let mul0 = (+bs.extra || 0) / 100;
+  let mul0 = (+bs.extra || 0) / 100 * scale;
   const opts = (B.opts||[]).concat(hidden ? (B.hiddenOpts||[]) : []);
   opts.forEach(o => { const on = bs.opts[o.key] ?? o.def; mul0 *= on ? o.mul : (o.alt ?? 1); });
   const phases = (B.phases||[]).slice().sort((a,b) => b.below - a.below);
   // 阶段 k：已触发前 k 个生命阈值（生命只减不增，阈值效果视为持续）
   const st = [{def:def0, res:res0, mul:mul0}];
   phases.forEach((p,i) => { const q = st[i]; st.push({def:q.def*(p.defMul||1), res:Math.min(100, q.res+(p.resAdd||0)), mul:q.mul*(p.mul??1)}); });
-  const cap = Math.max(10, +bs.cap || 600);
+  const cap = capOverride || Math.max(10, +bs.cap || 600);
   const ctx = {...ctxFor(state), horizon:cap};
   const units = [];
   S.field.slice(0, fieldCap()).forEach((u,i) => {
@@ -661,6 +665,26 @@ function bossSim(state){
   }
   return {B, HP, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
 }
+// 输出整体乘以 k 倍后能否在 T 秒内击杀；二分求刚好够用的 k
+function bossNeedScale(state, T){
+  const ok = k => { const r = bossSim(state, k, T); return r.kill != null; };
+  let lo = 0, hi = 1;
+  if (ok(1)) { hi = 1; } else { lo = 1; hi = 2; while (!ok(hi)) { lo = hi; hi *= 2; if (hi > 1024) return null; } }
+  for (let i = 0; i < 22; i++){ const m = (lo + hi) / 2; if (ok(m)) hi = m; else lo = m; }
+  return hi;
+}
+// 领袖轮判定：限时内击杀=完美；超时每秒扣 1 点目标生命值（向上取整计）
+function bossVerdict(R){
+  const bs = S.boss, T = Math.max(1, +bs.limit || 120);
+  const life = bs.life === "" || bs.life == null ? null : +bs.life;
+  if (!R.units.length) return null;
+  if (R.kill != null && R.kill <= T) return {cls:"ok", head:"✅ 限时内击杀", text:`比时限 ${T} 秒早 ${(T - R.kill).toFixed(1)} 秒，不扣目标生命值。`};
+  const over = R.kill != null ? Math.ceil(R.kill - T) : null;
+  if (over != null && life != null && over < life) return {cls:"warn", head:"⚠️ 超时但能通过", text:`超时 ${over} 秒，扣 ${over} 点目标生命值，剩余 ${life - over}。`};
+  if (over != null && life == null) return {cls:"warn", head:`⚠️ 超时 ${over} 秒`, text:`需要合计目标生命值 > ${over} 才能撑到击杀（可在上方填写剩余目标生命值）。`};
+  if (over != null) return {cls:"bad", head:"❌ 撑不到击杀", text:`需超时 ${over} 秒，但只剩 ${life} 点目标生命值。`};
+  return {cls:"bad", head:"❌ 模拟上限内未击杀", text:`${R.cap} 秒内没打死；超时部分已超过 ${R.cap - T} 秒。`};
+}
 function renderBoss(state){
   const bs = S.boss, B = BOSSES.list.find(b => b.name === bs.name);
   const pick = `<div class="bosspick">${BOSSES.list.map(b => `<button type="button" data-bpick="${esc(b.name)}" class="${b.name===bs.name?"on":""}" title="${esc(b.name)}${b.hidden?"（有隐秘核心）":""}"><img src="${bossAvatar(b.name)}" alt=""><span>${esc(b.name)}</span>${b.hidden?"<i>隐</i>":""}</button>`).join("")}</div>`;
@@ -673,6 +697,8 @@ function renderBoss(state){
     <label>法抗（留空=资料值）<input type="number" min="0" max="100" step="5" data-bs="res" value="${esc(bs.res??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hres:B.res) : ""}"></label>
     <label>额外受伤倍率 %<input type="number" min="0" step="5" data-bs="extra" value="${bs.extra}"></label>
     <label>模拟上限（秒）<input type="number" min="10" step="60" data-bs="cap" value="${bs.cap}"></label>
+    <label title="PRTS：领袖轮作战时长上限 120 秒（所有模式相同）">领袖轮时限（秒）<input type="number" min="1" step="5" data-bs="limit" value="${bs.limit}"></label>
+    <label title="进入领袖轮时所有玩家剩余目标生命值合并；超时每秒扣 1 点">剩余目标生命值（合计）<input type="number" min="0" step="1" data-bs="life" value="${esc(bs.life??"")}" placeholder="不填=只看是否超时"></label>
   </div>`;
   if (!B){ $("bossBox").innerHTML = html + `<div class="muted" style="margin-top:6px">点上方头像选择领袖（标“隐”的有隐秘核心形态），再点一次取消。共 ${BOSSES.list.length} 个领袖，其中 ${BOSSES.list.filter(b=>b.hidden).length} 个有隐秘核心形态。</div>`; return; }
   const R = bossSim(state);
@@ -685,6 +711,13 @@ function renderBoss(state){
     <div><b>${f0(R.HP)}</b><span>生命值${R.hidden?"（隐秘核心）":""}</span></div>
     <div><b>${f0(R.def0)} / ${f0(R.res0)}</b><span>防御 / 法抗</span></div>
     <div><b>${R.kill ? f0(R.HP / R.kill) : f0(total / R.cap)}</b><span>平均有效 DPS</span></div></div>`;
+  const V = bossVerdict(R);
+  if (V){
+    const T = Math.max(1, +bs.limit || 120), k = bossNeedScale(state, T);
+    const need = k == null ? "当前阵容输出太低，无法估算所需倍率。"
+      : `${T} 秒内击杀需要平均有效 DPS ≈ <b>${f0(R.HP / T)}</b>；按当前阵容的出伤节奏，需要输出达到现在的 <b>×${k.toFixed(2)}</b>${k <= 1 ? `（还有 ${((1/k - 1)*100).toFixed(0)}% 余量）` : `（还差 ${((k - 1)*100).toFixed(0)}%）`}。`;
+    html += `<div class="verdict ${V.cls}"><b>${V.head}</b> ${V.text}<div style="margin-top:3px">${need}</div></div>`;
+  }
   if (R.phases.length) html += `<div class="muted" style="font-size:12px">阶段：${R.phases.map(p => {
       const m = R.marks.find(x => x.label === p.label);
       return `${esc(p.label)} → ${m ? `第 ${m.t.toFixed(1)} 秒触发` : "未触发"}`; }).join("；")}</div>`;
@@ -740,6 +773,8 @@ const RULES_HTML = `
   <li>收录 PRTS「敌方资料」中的全部 10 个领袖；假想敌：胄/铳/管/械/茧/鳍 有隐秘核心形态（险境及以上、规程等级 5 及以上，生命值为红色数值）。</li>
   <li>生命值按所选难度/规程等级取表；防御/法抗取自敌人页面级别数据，可手动覆盖。</li>
   <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
+  <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
+  <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
   <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
 </ul>`;
 
@@ -869,7 +904,7 @@ $("bossBox").addEventListener("change", e => {
   const k = t.dataset.bs; if (!k) return;
   if (k === "hidden") bs.hidden = t.checked;
   else if (k === "name" || k === "mode") bs[k] = t.value;
-  else if (k === "def" || k === "res") bs[k] = t.value === "" ? "" : Math.max(0, +t.value||0);
+  else if (k === "def" || k === "res" || k === "life") bs[k] = t.value === "" ? "" : Math.max(0, +t.value||0);
   else bs[k] = Math.max(0, +t.value||0);
   render();
 });
