@@ -125,6 +125,8 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .recr .ra .rx{height:26px;line-height:24px;padding:0 5px;border-radius:4px;border:1px dashed var(--line);font-size:11px;color:var(--muted)}
 .sksrc{font-size:11px;padding:0 5px;border-radius:4px;border:1px solid var(--accent2);color:var(--muted)}
 .skp ol{margin:0;padding-left:20px;line-height:1.7;font-size:12px}
+.skp a{color:var(--accent)}
+.skp .skbm{display:inline-block;padding:2px 10px;border:1px solid var(--accent);border-radius:6px;font-weight:bold;text-decoration:none;cursor:grab;margin:0 4px}
 .skp code{font-size:11px;background:var(--panel2);padding:0 4px;border-radius:3px;word-break:break-all}
 .skp textarea{width:100%;box-sizing:border-box;font-size:12px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px}
 .recr .rm{color:var(--muted);margin-top:4px;line-height:1.5}
@@ -1183,7 +1185,7 @@ const RULES_HTML = `
   <li><b>修补</b>：阵容里有人本局拿不到（被禁、要策略）时，在购买清单、阵容库或对局规划「我的阵容本局可用吗」里点「修补」：先换成可用的备选，再按原阵容的盟约档位从可用干员里补人，其他人和位置、装备不动；结果作为当前阵容载入，原阵容不变，会提示哪些盟约档位没保住。</li>
   <li><b>分享</b>：顶部「分享」或阵容库卡片上的「分享」生成链接（阵容压缩在网址里，不经过服务器），对方打开就能载入。「导出 / 导入」是所有阵容的 JSON 备份。</li>
   <li><b>搜索与筛选</b>：干员池、装备、阵容库的搜索都支持拼音全拼和首字母（如 fz、fuzou → 复奏）。干员池「更多筛选」可按第二个盟约、特质类型、触发时机筛，或只看本局能拿到的、隐藏阵容里已有的；本局被禁的干员会变暗并标「禁」。阵容库可按本局可用 / 不可用、包含的盟约筛选。</li>
-  <li><b>从森空岛导入</b>（战绩 → 从森空岛导入）：森空岛「卫戍协议·规程」页上的历史对局可以导进来。在电脑浏览器打开森空岛的卫戍攻略编辑页并登录，打开开发者工具（F12 → 网络），点页面上的「导入历史战绩」后找到 history-log 请求，复制它的「响应」粘贴进来即可。会带上阵容、精锐、装备、结束时的盟约层数、策略、模式、首领（是否击杀）、回合数、击倒数、花费和用时；没有禁用信息。森空岛的自选干员不在本工具的干员表里，只显示名字。编号对照来自 StrongholdAssistant（Apache-2.0）。</li>
+  <li><b>从森空岛导入</b>（战绩 → 从森空岛导入）：森空岛「卫戍协议·规程」页上的历史对局可以导进来。推荐用一键导入：把「卫戍战绩导入」书签拖到书签栏（手机上复制书签代码后新建书签），在森空岛卫戍攻略编辑页登录后点这个书签，就会自动读取战绩并导入。书签只读历史战绩这一份数据，不读账号、密码或登录凭证。书签用不了时可以手动导入：开发者工具（F12 → 网络）里点「导入历史战绩」后找到 history-log 请求，复制它的「响应」粘贴进来。会带上阵容、精锐、装备、结束时的盟约层数、策略、模式、首领（是否击杀）、回合数、击倒数、花费和用时；没有禁用信息。森空岛的自选干员不在本工具的干员表里，只显示名字。编号对照来自 StrongholdAssistant（Apache-2.0）。</li>
   <li><b>对局记录 / 战绩</b>（顶部「战绩」、手机底部「战绩」、对局规划「本局结束 · 记录结果」）：一局打完后点「通关」或「失败」就保存，阵容（终局）、激活的盟约、策略、禁用、模式和首领自动带上，回合数和备注可不填；默认同时清空本局信息，方便下一局。「战绩」页按模式筛选，看总通关率、平均回合、最近 10 局，以及按核心盟约、策略、干员、首领分别统计。记录只存在这台设备上，可用「导出 / 导入」备份或换设备（顶部的导出也会带上记录）。</li>
   <li><b>变形同构体</b>（对局规划）：设置最多几个变形后，终局推荐和目标盟约搜索会考虑让某名干员带「变形同构体 + 对应装备」多拿一个盟约（例如差 1 人到下一档时）。卡片上写明谁带哪件装备，载入时自动装上。被禁的盟约不能作为变形目标；过渡阵容不用变形（同构体是 6 阶装备）。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
@@ -2550,21 +2552,92 @@ function skImportText(txt){
   recSkOpen = false; recV = "stats"; renderRec();
   toast(`读到 ${list.length} 局，新增 ${n} 局` + (unknown.size ? `；${unknown.size} 个干员编号没对上` : ""));
 }
+// 一键导入书签：在森空岛页面上运行，自己点「导入历史战绩」，截下 history-log 的响应，发给本工具（不碰登录凭证，不经过服务器）
+const SK_BM = function(){
+  var A = "__APP__", O = new URL(A).origin;
+  if (window.__wsxy) { window.__wsxy(); return; }
+  var data = null, w = null, ok = false, box = null;
+  function post(){ if (data && w && !ok) { try { w.postMessage({type: "sk-history", text: data}, O); } catch (e) {} } }
+  function fallback(){
+    if (ok || !data || box) return;
+    box = document.createElement("div");
+    box.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483647;background:#fff;color:#222;border:2px solid #2a8;border-radius:10px;padding:12px;font:14px/1.5 sans-serif;box-shadow:0 4px 20px #0005";
+    box.innerHTML = "<b>战绩已读到</b>，但没能自动打开阵容模拟器。点「复制」，再到 阵容模拟器 → 战绩 → 从森空岛导入 → 手动导入，粘贴后点导入。<br>";
+    var b = document.createElement("button"); b.textContent = "复制战绩"; b.style.cssText = "margin:8px 8px 0 0;padding:6px 14px";
+    b.onclick = function(){ var t = document.createElement("textarea"); t.value = data; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); b.textContent = "已复制"; } catch (e) {} t.remove(); if (navigator.clipboard) navigator.clipboard.writeText(data).then(function(){ b.textContent = "已复制"; }, function(){}); };
+    var c = document.createElement("button"); c.textContent = "关闭"; c.style.cssText = "margin-top:8px;padding:6px 14px"; c.onclick = function(){ box.remove(); box = null; };
+    box.appendChild(b); box.appendChild(c); document.body.appendChild(box);
+  }
+  addEventListener("message", function(e){
+    if (e.origin !== O || !e.data) return;
+    if (e.data.type === "sk-ready") { w = e.source; post(); }
+    if (e.data.type === "sk-ok") { ok = true; if (box) { box.remove(); box = null; } }
+  });
+  function hit(u, t){ if (String(u).indexOf("history-log") >= 0 && t && !data) { data = t; post(); setTimeout(fallback, 6000); } }
+  var X = XMLHttpRequest.prototype, oo = X.open, os = X.send;
+  X.open = function(m, u){ this.__u = u; return oo.apply(this, arguments); };
+  X.send = function(){ var x = this; x.addEventListener("load", function(){ try { hit(x.__u, x.responseText); } catch (e) {} }); return os.apply(this, arguments); };
+  var of = window.fetch;
+  window.fetch = function(i){ var u = i && i.url || i; return of.apply(this, arguments).then(function(r){ try { if (String(u).indexOf("history-log") >= 0) r.clone().text().then(function(t){ hit(u, t); }); } catch (e) {} return r; }); };
+  function go(){
+    var b = [].slice.call(document.querySelectorAll("button")).find(function(x){ return x.textContent.trim() === "导入历史战绩" && !x.disabled; });
+    if (!b) {
+      if (!/stronghold-guide\/edit/.test(location.pathname)) { alert("先打开森空岛的卫戍攻略编辑页（会自动跳过去），登录后再点一次这个书签。"); location.href = "https://game.skland.com/arknights/stronghold-guide/edit"; }
+      else alert("没找到「导入历史战绩」按钮：先登录森空岛，等页面加载完再点一次书签。");
+      return;
+    }
+    data = null; ok = false;
+    w = window.open(A + "#skimport", "wsxy_import");
+    b.click();
+    setTimeout(function(){ if (!data) alert("10 秒内没读到战绩。如果页面提示「未查询到游戏角色」，等几秒再点一次书签。"); }, 10000);
+  }
+  window.__wsxy = go; go();
+};
+const skAppUrl = () => location.origin + location.pathname.replace(/index\.html$/, "");
+const skBookmarklet = () => "javascript:" + encodeURIComponent("(" + SK_BM.toString().replace("__APP__", skAppUrl()).replace(/\s*\n\s*/g, " ") + ")()");
+let skManual = false;
 function skPanelHTML(){
+  const phone = isPhone();
   return `<div class="rf skp">
     <div class="rfh"><b>从森空岛导入以前的对局</b><span style="flex:1"></span><button type="button" id="skHide" style="font-size:12px;padding:2px 8px">收起</button></div>
+    <div><b>一键导入</b><span class="muted" style="font-size:12px">（只需设置一次）</span></div>
     <ol>
-      <li>在<b>电脑</b>浏览器（Chrome / Edge）打开 <code>game.skland.com/arknights/stronghold-guide/edit</code>，登录森空岛。</li>
-      <li>按 <b>F12</b> → 选「网络 / Network」→ 在过滤框输入 <code>history-log</code>。下半部分如果被「控制台 / Console」挡住，按一下 <b>Esc</b> 收起。</li>
-      <li>回到森空岛页面，点页面上的<b>「导入历史战绩」</b>按钮（点了才会去读战绩）。</li>
-      <li>网络列表里会出现 <code>history-log</code>，点这一行 →「响应 / Response」→ 在里面按 Ctrl+A、Ctrl+C 复制。</li>
-      <li>粘贴到下面的框里，点「导入」。</li>
+      ${phone
+        ? `<li>点 <button type="button" id="skCopyBm" style="font-size:12px;padding:1px 8px">复制书签代码</button>，在 Safari 里随便收藏一个网页为书签，再编辑这个书签：名字改成「卫戍战绩导入」，<b>网址整个换成刚复制的内容</b>。</li>`
+        : `<li>把这个按钮<b>拖到浏览器的书签栏</b>：<a class="skbm" href="${esc(skBookmarklet())}" onclick="event.preventDefault();toast('要拖到书签栏，不是点它')">卫戍战绩导入</a><span class="muted">（看不到书签栏按 Ctrl+Shift+B）</span></li>`}
+      <li>打开 <a href="https://game.skland.com/arknights/stronghold-guide/edit" target="_blank" rel="noopener">森空岛卫戍攻略编辑页</a>，登录森空岛（只要第一次，浏览器会记住）。</li>
+      <li>在那个页面上点书签「卫戍战绩导入」：它会自动点「导入历史战绩」、读出战绩，然后打开本工具导入。</li>
     </ol>
-    <div class="muted" style="font-size:12px">只复制「响应」里的内容，不要复制请求头（里面有你的登录凭证）。数据只在这台设备上转换和保存，不会上传。<br>要用在手机上：电脑上导入后点右上角「导出」，把文件发到手机，在手机上点「导入」选这个文件。重复导入不会重复记。</div>
+    <div class="muted" style="font-size:12px">书签只在森空岛页面里读取「历史战绩」这一份数据，交给本工具在你的设备上转换保存；不读也不发送你的账号、密码或登录凭证，不经过任何服务器。以后想更新战绩，再点一次书签就行，已有的局不会重复记。<br>电脑上导入的记录要放到手机：点右上角「导出」，把文件发到手机，在手机上点「导入」。</div>
+    ${skManual ? `<div style="margin-top:4px"><b>手动导入</b></div>
+    <ol>
+      <li>在电脑浏览器打开上面的森空岛页面并登录，按 <b>F12</b> →「网络 / Network」→ 过滤框输入 <code>history-log</code>（下半部分被控制台挡住就按 <b>Esc</b>）。</li>
+      <li>点页面上的<b>「导入历史战绩」</b>，列表里出现 <code>history-log</code> 后点它 →「响应 / Response」→ Ctrl+A、Ctrl+C。</li>
+      <li>粘贴到下面的框里，点「导入」。只复制「响应」，不要复制请求头。</li>
+    </ol>
     <textarea id="skText" rows="4" placeholder='粘贴在这里，开头一般是 {"code":0,"message":"OK","data":{"records":[…'></textarea>
-    <div class="rfb"><button type="button" class="primary" id="skGo">导入</button><button type="button" id="skFile">选文件…</button></div>
+    <div class="rfb"><button type="button" class="primary" id="skGo">导入</button><button type="button" id="skFile">选文件…</button></div>`
+    : `<button type="button" id="skMan" style="align-self:flex-start;font-size:12px;padding:2px 10px">书签用不了？手动导入</button>`}
   </div>`;
 }
+// 接收书签发来的战绩：只认森空岛页面（或本站自己）发来的消息
+let skWait = false;
+function skListen(){
+  if (!/^#skimport/.test(location.hash)) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  skWait = true; recSkOpen = false; openRec(false); toast("正在接收森空岛的战绩…");
+  const ping = () => { if (!skWait || !window.opener) return; try { window.opener.postMessage({type:"sk-ready"}, "*"); } catch(_){} setTimeout(ping, 500); };
+  ping();
+  setTimeout(() => { if (skWait){ skWait = false; toast("没收到战绩：回到森空岛页面再点一次书签"); } }, 20000);
+}
+window.addEventListener("message", e => {
+  if (!(/^https:\/\/([\w-]+\.)*skland\.com$/.test(e.origin) || e.origin === location.origin)) return;
+  const d = e.data; if (!d || d.type !== "sk-history" || typeof d.text !== "string") return;
+  try { e.source && e.source.postMessage({type:"sk-ok"}, e.origin); } catch(_){}
+  if (!skWait) return; skWait = false;
+  openRec(false); skImportText(d.text);
+});
+window.addEventListener("hashchange", skListen);
 function recLoad(id){
   const r = recAll().find(x => x.id === id); if (!r) return;
   if (!confirm(`载入这局的阵容？会替换当前正在编辑的阵容（已保存的不受影响）。`)) return;
@@ -2588,6 +2661,8 @@ $("rec").addEventListener("click", e => {
   if (t.closest("#skHide")){ recSkOpen = false; return renderRecForm(); }
   if (t.closest("#skGo")) return skImportText($("skText").value);
   if (t.closest("#skFile")) return $("recFile").click();
+  if (t.closest("#skMan")){ skManual = true; return renderRecForm(); }
+  if (t.closest("#skCopyBm")){ const code = skBookmarklet(); (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).then(() => toast("书签代码已复制"), () => prompt("复制下面全部内容：", code)); return; }
   const wb = t.closest("[data-rwin]"); if (wb) return recAdd(wb.dataset.rwin === "1");
   const sv = t.closest("[data-rv]"); if (sv){ recV = sv.dataset.rv; return renderRec(); }
   const ld = t.closest("[data-rload]"); if (ld) return recLoad(ld.dataset.rload);
@@ -2618,6 +2693,7 @@ refreshSaved();
 renderPool();
 render();
 openShared();
+skListen();
 </script>
 <script>
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
