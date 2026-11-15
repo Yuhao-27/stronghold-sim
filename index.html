@@ -60,6 +60,39 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .slot{min-height:150px;border:1px dashed var(--line);border-radius:8px;background:#121a1d;position:relative}
 .slot.over{border-color:var(--accent);background:#14302a}
 .slot.empty::before{content:"空位";position:absolute;inset:0;display:grid;place-items:center;color:#3f4d53}
+/* 简洁版 */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex:none}
+.seg button{border:0;border-radius:0;padding:3px 10px;font-size:12px;background:none}
+.seg button.on{background:var(--accent2);color:var(--text)}
+#cbonds{display:none}
+#libBody{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;align-content:start}
+.libc{border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:10px}
+.libc.cur{border-color:var(--accent)}
+.libc .lh{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.libc .lh b{font-size:14px}
+.libc .lh button{font-size:12px;padding:2px 9px}
+.libc .lf{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:4px}
+.libc .lf.bn{grid-template-columns:repeat(auto-fill,minmax(34px,1fr));margin-top:4px;opacity:.85}
+.libc .lm{text-align:center;min-width:0}
+.libc .lm img{width:100%;aspect-ratio:1;border-radius:5px;border-bottom:3px solid var(--tc);display:block}
+.libc .lm div{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.libc .sub{font-size:11px;color:var(--muted);margin-top:6px}
+#boardSec.compact #cbonds{display:block;margin:-4px 0 12px}
+#boardSec.compact #recoBox,#boardSec.compact #detail,#boardSec.compact .bhint{display:none}
+#boardSec.compact .slots{grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-bottom:10px}
+#boardSec.compact .slot{min-height:0;aspect-ratio:4/5}
+#boardSec.compact .slot.empty::before{font-size:11px}
+.mini{height:100%;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;box-sizing:border-box}
+.mini img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;border-bottom:3px solid var(--tc)}
+.mini .nm{font-size:11px;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.cb span{font-size:12px;padding:2px 7px;border-radius:4px;border:1px solid #2f4750;background:#1a262b;white-space:nowrap}
+.cb span b{font-weight:normal;color:var(--muted);margin-left:3px}
+.cb span.on{background:rgba(8,216,165,.14);border-color:rgba(8,216,165,.55);color:var(--text)}
+.cb span.on b{color:var(--accent)}
+.cb span.core.on{border-color:var(--accent);font-weight:bold}
+.cb.near span{opacity:.75;font-size:11px}
+.cb .lbl{border:0;background:none;padding:2px 0;color:var(--muted);font-size:11px}
 .card{padding:6px;height:100%;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:grab;display:flex;flex-direction:column;gap:4px;border-top:3px solid var(--tc)}
 .card.sel{outline:2px solid var(--accent)}
 .card .top{display:flex;gap:6px}
@@ -223,6 +256,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   #bondList{max-height:none}
   .slots{grid-template-columns:repeat(2,minmax(0,1fr))}
   .slot{min-height:96px}
+  #boardSec.compact .slots{grid-template-columns:repeat(4,minmax(0,1fr))}
   .card .top{gap:5px}
   .card img.av{width:40px;height:40px}
   .card .ctrl{flex-wrap:wrap}
@@ -236,8 +270,10 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   #mnav button.on{color:var(--accent)}
   #mnav button i{font-style:normal;font-size:10px;color:var(--accent)}
   #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
-  #modal,#rules{padding:8px!important}
-  #modal .box,#rules .box{max-height:92vh!important}
+  #modal,#rules,#lib{padding:8px!important}
+  #modal .box,#rules .box,#lib .box{max-height:92vh!important}
+  #libBody{grid-template-columns:1fr}
+  #mnav button{font-size:11px}
 }
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent2);border:1px solid var(--accent);padding:8px 14px;border-radius:8px;display:none;z-index:70}
 </style>
@@ -254,6 +290,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   <button id="btnNew">新建/清空</button>
   <span class="grow"></span>
   <label title="人事部文档：最大可部署人数变为9"><input type="checkbox" id="deploy9"> 人事部文档（部署上限9）</label>
+  <button id="btnLib">阵容库</button>
   <button id="btnRules">规则说明</button>
   <button id="btnExport">导出</button>
   <button id="btnImport">导入</button>
@@ -274,9 +311,11 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 
   <section id="boardSec">
     <div class="panel">
-      <div class="zone-h"><b>战场</b><span class="muted" id="fieldCount"></span></div>
+      <div class="zone-h"><b>战场</b><span class="muted" id="fieldCount"></span><span style="flex:1"></span>
+        <div class="seg" id="bvSeg" title="简洁版只显示头像和盟约，点头像进入完整版"><button type="button" data-bv="1">简洁</button><button type="button" data-bv="0">完整</button></div></div>
       <div class="slots" id="field"></div>
-      <div class="zone-h"><b>整备区</b><span class="muted">【远见】【奇迹】【投资人】干员在整备区也计入盟约</span></div>
+      <div id="cbonds"></div>
+      <div class="zone-h"><b>整备区</b><span class="muted bhint">【远见】【奇迹】【投资人】干员在整备区也计入盟约</span></div>
       <div class="slots" id="bench"></div>
     </div>
     <div class="panel" id="recoBox" style="margin-top:12px"></div>
@@ -323,12 +362,17 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   <div class="mh" style="display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--line)"><b>规则说明</b><span class="grow" style="flex:1"></span><button id="rulesClose">关闭</button></div>
   <div class="mb rules" style="overflow:auto;padding:4px 16px 16px" id="rulesBody"></div>
 </div></div>
+<div id="lib" style="position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:56;padding:16px"><div class="box" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(1100px,100%);max-height:90vh;display:flex;flex-direction:column">
+  <div class="mh" style="display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--line)"><b>阵容库</b><span class="muted" id="libCount" style="font-size:12px"></span><span style="flex:1"></span><button id="libClose">关闭</button></div>
+  <div style="overflow:auto;padding:12px" id="libBody"></div>
+</div></div>
 <div id="tip"></div>
 <div id="toast"></div>
 <nav id="mnav">
   <button data-view="pool"><b>☰</b>干员池</button>
   <button data-view="board"><b>▦</b>阵容<i id="mnavCount"></i></button>
   <button data-view="bonds"><b>◈</b>盟约 / 计算</button>
+  <button data-lib="1"><b>▤</b>阵容库</button>
 </nav>
 
 <script src="data.js"></script>
@@ -518,13 +562,29 @@ function cardHTML(u, zone, idx, bondState){
     <div class="equips">${eqs}</div>
   </div>`;
 }
+let compactBoard = store.get("wsxy-compact", false);
+const miniHTML = u => `<div class="mini" draggable="true" style="--tc:${TC[OPS[u.name].tier]}" title="${esc(u.name)}"><img src="${avatar(u.name)}" alt=""><div class="nm">${esc(u.name)}</div></div>`;
+// 简洁版的盟约汇总：已激活的 + 差 1~2 人的
+function compactBondsHTML(state){
+  const rs = Object.values(state.res).filter(r => r.count > 0);
+  const lv = r => { const t = THRESH[r.name]; return r.level >= t.length ? "满" : `${r.total}/${t[r.level]}`; };
+  const act = rs.filter(r => r.level > 0).sort((a,b) => b.level - a.level || b.total - a.total);
+  const near = rs.filter(r => r.level === 0 && r.name !== "独行").map(r => ({r, need:THRESH[r.name][0] - r.total})).filter(x => x.need > 0 && x.need <= 2).sort((a,b) => a.need - b.need);
+  const chip = (r, on) => `<span class="${on?"on":""} ${CORE.includes(r.name)?"core":""}" title="${esc(r.name)}：${r.total} 人，档位 ${THRESH[r.name].join("/")} 人">${esc(r.name)}<b>${on ? (lv(r) === "满" ? `${r.total}·满` : `${r.total}→${THRESH[r.name][r.level]}`) : `${r.total}/${THRESH[r.name][0]}`}</b></span>`;
+  return (act.length ? `<div class="cb"><span class="lbl">已激活 ${act.length}</span>${act.map(r => chip(r, true)).join("")}</div>` : `<div class="cb"><span class="lbl">还没有激活的盟约</span></div>`)
+    + (near.length ? `<div class="cb near"><span class="lbl">差 1~2 人</span>${near.map(x => chip(x.r, false)).join("")}</div>` : "");
+}
 function renderBoard(state){
   const cap = fieldCap();
   const bs = state.res;
+  $("boardSec").classList.toggle("compact", compactBoard);
+  document.querySelectorAll("#bvSeg [data-bv]").forEach(b => b.classList.toggle("on", (b.dataset.bv === "1") === compactBoard));
+  const body = (u, z, i) => !u ? "" : compactBoard ? miniHTML(u) : cardHTML(u, z, i, bs);
   $("field").innerHTML = S.field.slice(0,cap).map((u,i) =>
-    `<div class="slot ${u?"":"empty"}" data-zone="field" data-idx="${i}">${u?cardHTML(u,"field",i,bs):""}</div>`).join("");
+    `<div class="slot ${u?"":"empty"}" data-zone="field" data-idx="${i}">${body(u,"field",i)}</div>`).join("");
   $("bench").innerHTML = S.bench.map((u,i) =>
-    `<div class="slot ${u?"":"empty"}" data-zone="bench" data-idx="${i}">${u?cardHTML(u,"bench",i,bs):""}</div>`).join("");
+    `<div class="slot ${u?"":"empty"}" data-zone="bench" data-idx="${i}">${body(u,"bench",i)}</div>`).join("");
+  $("cbonds").innerHTML = compactBoard ? compactBondsHTML(state) : "";
   $("fieldCount").textContent = `${state.fieldN} / ${cap}`;
   if ($("mnavCount")) $("mnavCount").textContent = `${state.fieldN}/${cap}`;
 }
@@ -942,6 +1002,7 @@ const RULES_HTML = `
   <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
+  <li><b>简洁 / 完整</b>：战场右上角切换。简洁版只显示头像和盟约汇总（已激活的、差 1~2 人的），点头像回到完整版并打开该干员明细。<b>阵容库</b>（顶部按钮 / 手机底栏）用简洁版列出所有保存的阵容，可直接载入或删除。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
   <li><b>推荐装备</b>（战场下方）：分「长期装备」和「一次性道具」两组。长期装备逐件试给每名场上非治疗干员（有空栏就加，满栏试替换一件，不动变形同构体及其对应装备），按该干员 x 秒平均 DPS 提升排序；卫戍推荐信/多功能补剂按“已激活盟约 +3 层”后全队 DPS 提升选人；已带组合装备一半的提示另一半；变形同构体只在某盟约差 1 人到下一档时推荐。一次性道具：随身身份牌按 +3 层全队收益；简易通讯机/寻呼模块/人事部记录选第一盟约离下一档最近的干员；博士投影选晋升精锐后全队 DPS 涨得最多的；信标选拿掉后掉盟约最少、输出最低的；资金/商店类与携带者无关。可用“商店等级”过滤。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
@@ -1222,6 +1283,7 @@ $("tierbar").addEventListener("click", e => { const b = e.target.closest("button
   el.addEventListener("click", e => {
     const slot = e.target.closest(".slot"); if (!slot || !S[slot.dataset.zone][+slot.dataset.idx]) return;
     const pos = {zone:slot.dataset.zone, idx:+slot.dataset.idx}, u = S[pos.zone][pos.idx];
+    if (compactBoard){ compactBoard = false; store.set("wsxy-compact", false); selected = pos; render(); $("detail").scrollIntoView({behavior:"smooth", block:"start"}); return; }
     const act = e.target.closest("[data-act]"), eq = e.target.closest("[data-eq]");
     if (act && act.dataset.act==="swap"){
       const tz = pos.zone === "field" ? "bench" : "field";
@@ -1252,6 +1314,10 @@ $("tierbar").addEventListener("click", e => { const b = e.target.closest("button
   });
 });
 
+$("bvSeg").addEventListener("click", e => {
+  const b = e.target.closest("[data-bv]"); if (!b) return;
+  compactBoard = b.dataset.bv === "1"; store.set("wsxy-compact", compactBoard); render();
+});
 // bond layers
 $("bondList").addEventListener("change", e => {
   const i = e.target.closest("[data-layer]"); if (!i) return;
@@ -1403,7 +1469,7 @@ function closeModal(){ $("modal").classList.remove("show"); eqTarget = null; }
 $("mQ").addEventListener("input", renderEquip);
 $("mClose").addEventListener("click", closeModal);
 $("modal").addEventListener("click", e => { if (e.target.id==="modal") closeModal(); });
-document.addEventListener("keydown", e => { if (e.key==="Escape"){ closeModal(); $("rules").style.display = "none"; } });
+document.addEventListener("keydown", e => { if (e.key==="Escape"){ closeModal(); $("rules").style.display = "none"; $("lib").style.display = "none"; } });
 $("mClear").addEventListener("click", () => { const u=S[eqTarget.pos.zone][eqTarget.pos.idx]; u.equips[eqTarget.k]=undefined; u.equips=compactEq(u.equips); closeModal(); render(); });
 $("mBody").addEventListener("click", e => {
   const it = e.target.closest(".eqitem"); if (!it || !eqTarget) return;
@@ -1438,6 +1504,38 @@ $("btnSave").addEventListener("click", () => {
   S.name = name; const all = savedAll();
   all[name] = JSON.parse(JSON.stringify(S));
   if (store.set("wsxy-lineups", all)) { refreshSaved(name); toast("已保存：" + name); } else toast("保存失败（浏览器禁止本地存储），请用“导出”");
+});
+// ===== 阵容库：所有保存的阵容（简洁版）=====
+function libCardHTML(k, L){
+  const keep = S; let st, N;
+  try { S = normalize(L); N = S; st = compute(); } finally { S = keep; }
+  const cap = N.deploy9 ? 9 : 8;
+  const lm = u => `<div class="lm" style="--tc:${TC[OPS[u.name].tier]}" title="${esc(u.name)}${u.elite?"（精锐）":""}"><img src="${avatar(u.name)}" alt="" loading="lazy"><div>${esc(u.name)}</div></div>`;
+  const f = N.field.slice(0, cap).filter(Boolean), b = N.bench.filter(Boolean);
+  return `<div class="libc ${k===S.name?"cur":""}">
+    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">场上 ${f.length}/${cap}${b.length?` · 整备 ${b.length}`:""}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
+      <button class="primary" data-lload="${esc(k)}">载入</button><button data-ldel="${esc(k)}">删除</button></div>
+    <div class="lf">${f.map(lm).join("") || '<span class="muted" style="font-size:12px">战场为空</span>'}</div>
+    ${b.length ? `<div class="sub">整备区</div><div class="lf bn">${b.map(lm).join("")}</div>` : ""}
+    ${compactBondsHTML(st)}
+  </div>`;
+}
+function renderLib(){
+  const all = savedAll(), ks = Object.keys(all).sort((a,b) => a.localeCompare(b, "zh"));
+  $("libCount").textContent = ks.length ? `${ks.length} 个` : "";
+  $("libBody").innerHTML = ks.map(k => libCardHTML(k, all[k])).join("")
+    || `<div class="muted">还没有保存的阵容。在顶部${isPhone()?"「阵容管理 ▾」里":""}填名称后点「保存」。</div>`;
+}
+const openLib = () => { renderLib(); $("lib").style.display = "flex"; };
+const closeLib = () => $("lib").style.display = "none";
+$("btnLib").addEventListener("click", openLib);
+$("mnav").addEventListener("click", e => { if (e.target.closest("[data-lib]")) openLib(); });
+$("libClose").addEventListener("click", closeLib);
+$("lib").addEventListener("click", e => {
+  if (e.target.id === "lib") return closeLib();
+  const ld = e.target.closest("[data-lload]"), dl = e.target.closest("[data-ldel]");
+  if (ld){ const k = ld.dataset.lload; S = normalize(savedAll()[k]); selected = null; refreshSaved(k); render(); closeLib(); if (isPhone()) setView("board"); toast("已载入：" + k); }
+  if (dl){ const k = dl.dataset.ldel; if (!confirm(`删除阵容「${k}」？`)) return; const all = savedAll(); delete all[k]; store.set("wsxy-lineups", all); refreshSaved(); renderLib(); toast("已删除"); }
 });
 $("btnLoad").addEventListener("click", () => {
   const k = $("savedSel").value; if (!k) return; S = normalize(savedAll()[k]); selected=null; render(); toast("已载入：" + k);
