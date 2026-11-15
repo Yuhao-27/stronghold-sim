@@ -85,6 +85,23 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .mini{height:100%;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;box-sizing:border-box}
 .mini img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;border-bottom:3px solid var(--tc)}
 .mini .nm{font-size:11px;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph{font-size:13px;font-weight:bold;margin:10px 0 5px}.ph small{font-weight:normal;color:var(--muted);margin-left:4px}
+.pgr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.pgr label{display:flex;flex-direction:column;gap:3px;font-size:13px;font-weight:bold;min-width:0}.pgr select{font-weight:normal;width:100%}
+.pbs{display:flex;flex-wrap:wrap;gap:5px}
+.pb{font-size:12px;padding:3px 9px}
+.pb.on{background:rgba(255,98,55,.18);border-color:var(--warn);color:#ffb39e;text-decoration:line-through}
+.pws{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.pws span{font-size:12px;padding:2px 4px 2px 8px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);display:flex;align-items:center;gap:4px}
+.pws span b{color:var(--accent)}.pws button{padding:0 6px;font-size:12px;line-height:18px}
+.psh{font-size:14px;margin:14px 0 6px}.psh small{font-weight:normal;color:var(--muted);font-size:12px;margin-left:4px}
+.libc.pc{margin-bottom:8px}.libc.pc .lf{grid-template-columns:repeat(8,minmax(0,1fr))}
+.best{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--accent);color:#06261d;font-weight:bold}
+.pchk{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.pchk span{font-size:11px;padding:1px 6px;border-radius:4px}
+.pchk .ok{background:#163a33;color:var(--accent)}.pchk .bad{background:#3a1d14;color:#ff9b7d}
+.pw{padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}.pw>b{color:var(--accent);margin-right:6px}.pw .muted{font-size:12px}
+.pl{display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+.pl.ok>span:first-child{color:var(--accent)}.pl.bad>span:first-child{color:var(--warn)}.pl .muted{font-size:12px}.pl button{font-size:12px;padding:2px 9px}
+@media (max-width:760px){.libc.pc .lf{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .cb{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
 .cb span{font-size:12px;padding:2px 7px;border-radius:4px;border:1px solid #2f4750;background:#1a262b;white-space:nowrap}
 .cb span b{font-weight:normal;color:var(--muted);margin-left:3px}
@@ -158,6 +175,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 #tip{position:fixed;pointer-events:none;z-index:60;background:#0b1013;border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:340px;font-size:12px;display:none}
 .tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
 .tabs button{padding:4px 12px}
+@media (max-width:760px){.tabs{flex-wrap:nowrap}.tabs button{padding:4px 8px;font-size:13px;flex:1 1 auto;white-space:nowrap}}
 .tabs button.on{background:var(--accent2);border-color:var(--accent)}
 .lyr{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);margin-bottom:6px}
 .lyr.act{border-color:#1f6b5a}
@@ -323,7 +341,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   </section>
 
   <section class="panel" id="bondPanel">
-    <div class="tabs" id="tabs"><button data-tab="bonds" class="on">盟约激活</button><button data-tab="layers">层数设置</button><button data-tab="dps">属性 / DPS</button></div>
+    <div class="tabs" id="tabs"><button data-tab="bonds" class="on">盟约激活</button><button data-tab="layers">层数设置</button><button data-tab="dps">属性 / DPS</button><button data-tab="plan">对局规划</button></div>
     <div id="tab-bonds">
       <h2>盟约激活 <small id="bondSummary"></small>
         <label style="margin-left:auto;font-size:12px;font-weight:normal;display:flex;gap:4px;align-items:center"><input type="checkbox" id="showAll">显示全部</label></h2>
@@ -350,6 +368,11 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
       <div id="bossBox"></div>
       <h2 style="margin-top:18px">回合模拟 <small>自定义一轮敌人，看当前阵容输出够不够</small></h2>
       <div id="roundBox"></div>
+    </div>
+    <div id="tab-plan" hidden>
+      <h2>对局规划 <small>按本局禁用、首领和波次推荐阵容</small></h2>
+      <div id="planIn"></div>
+      <div id="planOut" style="margin-top:12px"></div>
     </div>
   </section>
 </main>
@@ -1004,6 +1027,7 @@ const RULES_HTML = `
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
   <li><b>简洁 / 完整</b>：战场右上角切换。简洁版只显示头像和盟约汇总（已激活的、差 1~2 人的），点头像回到完整版并打开该干员明细。<b>阵容库</b>（顶部按钮 / 手机底栏）用简洁版列出所有保存的阵容，可直接载入或删除。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
+  <li><b>对局规划</b>（盟约 / 计算 → 对局规划）：填本局禁用的核心盟约（≤5）、附加盟约（≤5）、首领和每波敌人特点。禁用规则：带任一被禁核心盟约的干员不出现；其他干员要全部盟约都被禁才不出现；被禁的盟约按无法激活处理。每个未被禁的核心盟约各给一套 8 人阵容，按盟约、波次需求（飞行要远程、隐匿要近战、元素/持续要医疗、致命/特异要重装……）、代入盟约后的全队 DPS 和首领击杀时间排序；不含装备和精锐。下方还会列出已保存的阵容本局能不能用。本局信息单独保存，换阵容不会清掉。</li>
   <li><b>推荐装备</b>（战场下方）：分「长期装备」和「一次性道具」两组。长期装备逐件试给每名场上非治疗干员（有空栏就加，满栏试替换一件，不动变形同构体及其对应装备），按该干员 x 秒平均 DPS 提升排序；卫戍推荐信/多功能补剂按“已激活盟约 +3 层”后全队 DPS 提升选人；已带组合装备一半的提示另一半；变形同构体只在某盟约差 1 人到下一档时推荐。一次性道具：随身身份牌按 +3 层全队收益；简易通讯机/寻呼模块/人事部记录选第一盟约离下一档最近的干员；博士投影选晋升精锐后全队 DPS 涨得最多的；信标选拿掉后掉盟约最少、输出最低的；资金/商店类与携带者无关。可用“商店等级”过滤。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
   <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
@@ -1225,10 +1249,293 @@ function buildReco(state){
   $("recoBox").innerHTML = html;
 }
 
+// ===== 对局规划：禁用盟约 + 首领 + 每波敌人特点 → 可玩阵容 =====
+const SUBS = D.bonds.filter(b => b.category !== "核心盟约").map(b => b.name);
+const WAVE_TAGS = Object.keys(ENEMIES.pool);
+const WAVE_INFO = {
+  "特异":{d:"高血量、高攻击，能打也能扛", tip:"要有重装顶住，同时保证总输出"},
+  "飞行":{d:"包含大量空中单位", tip:"近战位打不到空中单位，至少要 3 名远程输出"},
+  "频次":{d:"需要一定攻击次数才能击破", tip:"攻速快、多段攻击的干员更有效，单发高伤会浪费"},
+  "元素":{d:"造成元素损伤", tip:"带医疗；高血量干员更能扛"},
+  "持续":{d:"擅长造成持续性伤害", tip:"带医疗持续回血，或用高血量重装吸收"},
+  "隐匿":{d:"拥有隐匿：远程干员无法选中，被阻挡后才能攻击", tip:"至少要 2 名近战位阻挡，远程才打得到"},
+  "折射":{d:"拥有折射：对普通法术伤害有很强的抗性", tip:"以物理或真实伤害为主，法术输出打折"},
+  "致命":{d:"特定条件下造成高额伤害", tip:"要有重装阻挡，再带医疗"},
+  "复苏":{d:"首次被击倒后会重生", tip:"相当于每只要打两次，需要更高的持续输出"},
+};
+// 每类敌人的平均血量 / 防御 / 法抗（按 PRTS 第一级别）
+const WAVE_AVG = {};
+WAVE_TAGS.forEach(t => {
+  const L = ENEMIES.pool[t].map(n => ENEMIES.enemies[n]).filter(Boolean).map(e => e.lv[0]);
+  const m = k => L.length ? L.reduce((a,x) => a + (+x[k]||0), 0) / L.length : 0;
+  WAVE_AVG[t] = {hp:m("hp"), def:m("def"), res:m("res"), n:L.length};
+});
+const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟"};
+let PLAN = {...DEFAULT_PLAN, ...store.get("wsxy-plan", {})};
+const savePlan = () => store.set("wsxy-plan", PLAN);
+
+// 禁用规则：带任一被禁核心盟约 → 不出现；否则所有盟约都被禁才不出现
+function opBanned(name){
+  const o = OPS[name]; if (!o) return false;
+  if (o.wild) return PLAN.banCore.includes(o.wild) || PLAN.banSub.includes(o.wild);
+  const banned = new Set([...PLAN.banCore, ...PLAN.banSub]);
+  return o.bonds.some(b => PLAN.banCore.includes(b)) || o.bonds.every(b => banned.has(b));
+}
+const bondBanned = b => PLAN.banCore.includes(b) || PLAN.banSub.includes(b);
+const statSrc = n => (window.STATS && STATS.src && STATS.src[(STATS.map||{})[n] ?? n]) || null;
+
+// 敌人防御/法抗：选了波次 → 取这些类别的平均；否则用 DPS 页的设定
+function waveEnemy(){
+  if (!PLAN.waves.length) return {def:+S.calc.def||0, res:+S.calc.res||0};
+  const a = PLAN.waves.map(t => WAVE_AVG[t]);
+  return {def: a.reduce((s,x) => s + x.def, 0) / a.length, res: a.reduce((s,x) => s + x.res, 0) / a.length};
+}
+const planBoss = () => BOSSES.list.find(b => b.name === PLAN.boss) || null;
+
+// 每名干员单独（无盟约、无装备）对波次敌人 / 首领的 DPS 和定位
+let featCache = {key:"", F:null};
+function opFeatures(){
+  const en = waveEnemy(), B = planBoss();
+  const key = JSON.stringify([en, B && B.name, S.calc.x, S.calc.trust]);
+  if (featCache.key === key) return featCache.F;
+  const F = {};
+  withTemp(() => { S.field = Array(9).fill(null); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
+    const base = ctxFor(st);
+    const ctxW = {...base, calc:{...S.calc, def:en.def, res:en.res, targets:1}};
+    const ctxB = B ? {...base, calc:{...S.calc, def:B.def, res:B.res, targets:1}} : null;
+    D.operators.forEach(o => {
+      const u = {name:o.name, elite:false, equips:[]}, pos = {zone:"field", idx:0};
+      const R = CALC.evaluate(u, pos, ctxW), src = statSrc(o.name);
+      const f = {name:o.name, tier:TIERS.indexOf(o.tier), cls:src && src.cls, pos:src && src.pos,
+        heal:false, dmg:0, boss:0, magic:false, iv:9, known:!R.error};
+      if (!R.error){
+        f.heal = R.typeN === "heal";
+        if (!f.heal){ f.dmg = R.avg; f.magic = R.typeN === "magic"; f.iv = R.Fn.interval; }
+        if (ctxB && !f.heal){ const RB = CALC.evaluate(u, pos, ctxB); if (!RB.error) f.boss = RB.avg; }
+      }
+      if (f.cls === "医疗") f.heal = true;
+      f.ranged = f.pos === "远程位" || /远程攻击/.test((src && src.trait) || "");
+      f.melee = f.pos === "近战位";
+      f.tank = f.cls === "重装";
+      F[o.name] = f;
+    });
+  });
+  featCache = {key, F};
+  return F;
+}
+
+// ---- 打分（只看场上 8 人，近似：不计精锐/同构体/整备区） ----
+const BI = {}; D.bonds.forEach((b,i) => BI[b.name] = i);
+function planSearch(){
+  const F = opFeatures(), B = planBoss();
+  const avail = D.operators.filter(o => !opBanned(o.name)).map(o => o.name);
+  const wc = {}; PLAN.waves.forEach(t => wc[t] = (wc[t]||0) + 1);
+  const w = t => wc[t] ? 1 + 0.3 * (wc[t] - 1) : 0;
+  const refraction = PLAN.waves.length ? (wc["折射"]||0) / PLAN.waves.length : 0;
+  const dmgMul = 1 + 0.2 * Math.min(1, (w("复苏") + w("特异")) / 2);
+  const top = arr => { const s = arr.slice().sort((a,b) => b - a).slice(0, 8); return s.length ? s.reduce((a,x) => a + x, 0) / s.length : 1; };
+  const refW = top(avail.map(n => F[n].dmg)) || 1, refB = B ? (top(avail.map(n => F[n].boss)) || 1) : 1;
+  // 单人价值
+  const V = {};
+  avail.forEach(n => {
+    const f = F[n]; let v;
+    if (f.heal) v = 1.6;
+    else if (!f.known) v = 1.2;
+    else {
+      let d = f.dmg * (f.magic ? 1 - 0.5 * refraction : 1) / refW;
+      if (B) d = 0.6 * d + 0.4 * f.boss / refB;
+      v = 2.6 * d * dmgMul;
+    }
+    V[n] = v + 0.12 * f.tier;
+  });
+  const OB = {}; avail.forEach(n => OB[n] = OPS[n].bonds.filter(b => !bondBanned(b)).map(b => BI[b]));
+  const cnt = new Int8Array(D.bonds.length);
+  const iHarm = BI["调和"], iSolo = BI["独行"], iSkill = BI["绝技"];
+  const coreIdx = new Set(CORE.map(c => BI[c]));
+  const TH = D.bonds.map(b => THRESH[b.name]);
+  function levels(team){
+    cnt.fill(0); team.forEach(n => OB[n].forEach(i => cnt[i]++));
+    const harm = cnt[iHarm] >= 1, L = new Int8Array(D.bonds.length);
+    for (let i = 0; i < L.length; i++){
+      if (!cnt[i] || i === iSkill) continue;
+      const n = cnt[i] + (harm && coreIdx.has(i) ? 1 : 0);
+      let l = 0; for (const t of TH[i]) if (n >= t) l++;
+      if (i === iSolo && cnt[i] !== 1) l = 0;
+      L[i] = l;
+    }
+    return L;
+  }
+  function score(team, ci){
+    const L = levels(team); let s = 0;
+    for (let i = 0; i < L.length; i++) if (L[i]) s += coreIdx.has(i) ? 6 + 5 * (L[i] - 1) : 3 + 2 * (L[i] - 1);
+    if (!L[ci]) s -= 100;
+    let ranged = 0, melee = 0, heal = 0, tank = 0, fast = 0;
+    team.forEach(n => { const f = F[n]; s += V[n];
+      if (f.ranged && !f.heal && f.dmg > 0) ranged++; if (f.melee) melee++; if (f.heal) heal++; if (f.tank) tank++;
+      if (!f.heal && f.dmg > 0 && f.iv <= 1.05) fast++; });
+    s -= w("飞行") * 3 * Math.max(0, 3 - ranged);
+    s -= w("隐匿") * 3 * Math.max(0, 2 - melee);
+    s -= Math.max(w("元素"), w("持续")) * 5 * (heal ? 0 : 1);
+    s -= w("致命") * (3 * (tank ? 0 : 1) + 2 * (heal ? 0 : 1));
+    s -= w("特异") * 2 * (tank ? 0 : 1);
+    s += w("频次") * 0.6 * Math.min(4, fast);
+    return s;
+  }
+  const N = 8, out = [];
+  CORE.filter(c => !PLAN.banCore.includes(c)).forEach(c => {
+    const ci = BI[c];
+    const own = avail.filter(n => OPS[n].bonds.includes(c));
+    if (own.length < THRESH[c][0]) { out.push({core:c, team:null, own}); return; }
+    let team = own.slice().sort((a,b) => V[b] - V[a]).slice(0, THRESH[c][0]);
+    while (team.length < N){
+      let best = null, bs = -Infinity;
+      avail.forEach(n => { if (team.includes(n)) return; const s = score(team.concat(n), ci); if (s > bs){ bs = s; best = n; } });
+      if (!best) break; team.push(best);
+    }
+    let cur = score(team, ci);
+    for (let it = 0; it < 40; it++){
+      let bt = null, bs = cur;
+      for (let k = 0; k < team.length; k++) for (const n of avail){
+        if (team.includes(n)) continue;
+        const t2 = team.slice(); t2[k] = n; const s = score(t2, ci);
+        if (s > bs + 1e-6){ bs = s; bt = t2; }
+      }
+      if (!bt) break; team = bt; cur = bs;
+    }
+    out.push({core:c, team, own, score:cur, F});
+  });
+  return {avail, list:out, F};
+}
+
+// 用真实盟约效果算一遍：全队 DPS（对波次平均敌人）+ 首领击杀时间
+function planEval(team){
+  const en = waveEnemy(), B = planBoss();
+  const calc0 = S.calc, boss0 = S.boss, d9 = S.deploy9;
+  try {
+    S.calc = {...S.calc, def:en.def, res:en.res}; S.deploy9 = false;
+    return withTemp(() => { S.field = Array(9).fill(null); team.forEach((n,i) => S.field[i] = {name:n, elite:false, equips:[]}); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
+      const r = {dps:teamAvg(st), res:st.res, kill:null};
+      if (B){ S.boss = {...DEFAULT_BOSS, opts:{}, name:B.name, mode:PLAN.mode}; const R = bossSim(st, 1, 600); r.kill = R ? R.kill : null; r.bossHP = R && R.HP; }
+      return r;
+    });
+  } finally { S.calc = calc0; S.boss = boss0; S.deploy9 = d9; }
+}
+
+function waveChecks(team, F){
+  const c = {ranged:0, melee:0, heal:0, tank:0, magic:0, fast:0};
+  team.forEach(n => { const f = F[n]; if (f.ranged && !f.heal && f.dmg > 0) c.ranged++; if (f.melee) c.melee++; if (f.heal) c.heal++; if (f.tank) c.tank++; if (f.magic) c.magic++; if (!f.heal && f.dmg > 0 && f.iv <= 1.05) c.fast++; });
+  const out = [], tags = new Set(PLAN.waves);
+  const add = (ok, t) => out.push(`<span class="${ok?"ok":"bad"}">${ok?"✓":"⚠"} ${t}</span>`);
+  if (tags.has("飞行")) add(c.ranged >= 3, `飞行：远程输出 ${c.ranged} 人`);
+  if (tags.has("隐匿")) add(c.melee >= 2, `隐匿：近战位 ${c.melee} 人`);
+  if (tags.has("元素") || tags.has("持续")) add(c.heal >= 1, `${tags.has("元素")?"元素":"持续"}：医疗 ${c.heal} 人`);
+  if (tags.has("致命")) add(c.tank >= 1 && c.heal >= 1, `致命：重装 ${c.tank} · 医疗 ${c.heal}`);
+  if (tags.has("特异")) add(c.tank >= 1, `特异：重装 ${c.tank} 人`);
+  if (tags.has("折射")) add(c.magic <= 2, `折射：法术输出 ${c.magic} 人`);
+  if (tags.has("频次")) add(c.fast >= 2, `频次：快攻速 ${c.fast} 人`);
+  return out.join("");
+}
+
+let planCache = {key:"", html:""}, planTimer = null;
+const planKey = () => JSON.stringify([PLAN, S.calc.x, S.calc.trust, S.calc.def, S.calc.res, Object.keys(savedAll())]);
+function renderPlan(){
+  if ($("tab-plan").hidden) return;
+  if (planKey() === planCache.key) return;
+  clearTimeout(planTimer);
+  $("planOut").style.opacity = ".55";
+  renderPlanInputs();
+  planTimer = setTimeout(() => { buildPlan(); $("planOut").style.opacity = ""; }, 60);
+}
+function renderPlanInputs(){
+  const chip = (b, kind) => { const on = PLAN[kind].includes(b); return `<button type="button" class="pb ${on?"on":""}" data-pban="${kind}:${esc(b)}">${esc(b)}</button>`; };
+  const bossOpts = `<option value="">（不选）</option>` + BOSSES.list.map(b => `<option${b.name===PLAN.boss?" selected":""}>${esc(b.name)}</option>`).join("");
+  const modeOpts = BOSSES.modes.map(m => `<option${m===PLAN.mode?" selected":""}>${m}</option>`).join("");
+  $("planIn").innerHTML = `
+    <div class="ph">禁用核心盟约 <small>${PLAN.banCore.length}/5</small></div><div class="pbs">${CORE.map(b => chip(b, "banCore")).join("")}</div>
+    <div class="ph">禁用附加盟约 <small>${PLAN.banSub.length}/5</small></div><div class="pbs">${SUBS.map(b => chip(b, "banSub")).join("")}</div>
+    <div class="pgr"><label>首领<select data-pk="boss">${bossOpts}</select></label><label>难度 / 规程等级<select data-pk="mode">${modeOpts}</select></label></div>
+    <div class="ph">每波敌人特点 <small>按顺序点选，可重复</small></div>
+    <div class="pbs">${WAVE_TAGS.map(t => `<button type="button" class="pb" data-pwave="${t}" title="${esc(WAVE_INFO[t]?.d||"")}">+ ${t}</button>`).join("")}</div>
+    <div class="pws">${PLAN.waves.length ? PLAN.waves.map((t,i) => `<span>第${i+1}波 <b>${t}</b><button type="button" data-pwdel="${i}" title="移除">×</button></span>`).join("") : `<span class="muted" style="border:0;background:none">还没有添加波次</span>`}</div>
+    <div style="margin-top:8px;display:flex;gap:6px"><button type="button" data-preset="1">清空本局信息</button></div>`;
+}
+function buildPlan(){
+  const key = planKey(), {avail, list, F} = planSearch();
+  const nBan = D.operators.length - avail.length;
+  let html = `<div class="muted" style="font-size:12px;margin:4px 0 8px">本局可用干员 <b style="color:var(--text)">${avail.length}</b> / ${D.operators.length}（被禁 ${nBan}）。被禁的盟约按无法激活处理。推荐只看场上 8 人的盟约和单人输出，不含装备和精锐；DPS 已代入盟约效果。</div>`;
+  // 推荐阵容
+  const B = planBoss();
+  const rows = list.filter(x => x.team).map(x => ({...x, ev:planEval(x.team)}));
+  // 排序：盟约/波次打分 + 代入盟约后的真实 DPS + 首领击杀速度
+  const maxD = Math.max(1, ...rows.map(x => x.ev.dps)), kills = rows.map(x => x.ev.kill).filter(k => k != null), bestK = kills.length ? Math.min(...kills) : 0;
+  rows.forEach(x => x.rank = x.score + 6 * x.ev.dps / maxD + (B && x.ev.kill != null ? 6 * bestK / x.ev.kill : 0));
+  rows.sort((a,b) => b.rank - a.rank);
+  html += `<h3 class="psh">推荐阵容 <small>按核心盟约各给一套，综合盟约、波次需求、全队输出${B ? "和首领击杀时间" : ""}排序</small></h3>`;
+  html += rows.map((x, i) => {
+    const act = Object.values(x.ev.res).filter(r => r.level > 0 && !bondBanned(r.name)).sort((a,b) => (CORE.includes(b.name) - CORE.includes(a.name)) || b.level - a.level);
+    const bonds = act.map(r => `<span class="on ${CORE.includes(r.name)?"core":""}">${esc(r.name)}<b>${r.total}${r.level >= THRESH[r.name].length ? "·满" : `→${THRESH[r.name][r.level]}`}</b></span>`).join("");
+    const ms = x.team.map(n => `<div class="lm" style="--tc:${TC[OPS[n].tier]}" title="${esc(n)}"><img src="${avatar(n)}" alt=""><div>${esc(n)}</div></div>`).join("");
+    const kill = B ? (x.ev.kill != null ? `首领 ${fmtT(x.ev.kill)} 击杀` : `首领 10 分钟内打不死`) : "";
+    const spare = x.own.filter(n => !x.team.includes(n));
+    return `<div class="libc pc">
+      <div class="lh">${i===0?'<span class="best">首选</span>':""}<b>${esc(x.core)}</b><span class="muted" style="font-size:12px">全队 DPS ${f0(x.ev.dps)}${kill ? " · " + kill : ""}</span><span style="flex:1"></span><button class="primary" data-pload="${i}">载入为阵容</button></div>
+      <div class="lf">${ms}</div>
+      <div class="cb">${bonds}</div>
+      ${PLAN.waves.length ? `<div class="pchk">${waveChecks(x.team, F)}</div>` : ""}
+      ${spare.length ? `<div class="sub">其他可用【${esc(x.core)}】干员：${spare.map(esc).join("、")}</div>` : ""}
+    </div>`;
+  }).join("") || `<div class="muted">没有可用的核心盟约。</div>`;
+  const short = list.filter(x => !x.team);
+  if (short.length) html += `<div class="muted" style="font-size:12px;margin-top:6px">凑不满 3 人：${short.map(x => `${x.core}（可用 ${x.own.length}）`).join("、")}</div>`;
+  planRows = rows;
+  // 波次建议
+  const tags = [...new Set(PLAN.waves)];
+  if (tags.length){
+    html += `<h3 class="psh">波次应对</h3>` + tags.map(t => { const a = WAVE_AVG[t], I = WAVE_INFO[t] || {};
+      const idx = PLAN.waves.map((x,i) => x === t ? i + 1 : 0).filter(Boolean);
+      return `<div class="pw"><b>${t}</b><span class="muted">第 ${idx.join("、")} 波 · 平均生命 ${f0(a.hp)} · 防御 ${f0(a.def)} · 法抗 ${f0(a.res)}</span><div>${esc(I.d||"")}。${esc(I.tip||"")}。</div></div>`; }).join("");
+  }
+  // 我保存的阵容本局能不能用
+  const all = savedAll(), ks = Object.keys(all);
+  if (ks.length){
+    const chk = ks.map(k => { const L = all[k];
+      const units = [...(L.field||[]), ...(L.bench||[])].filter(u => u && OPS[u.name]);
+      const bad = units.filter(u => opBanned(u.name)).map(u => u.name);
+      return {k, bad, n:units.length}; }).sort((a,b) => a.bad.length - b.bad.length);
+    html += `<h3 class="psh">我的阵容本局可用吗</h3>` + chk.map(c => `<div class="pl ${c.bad.length?"bad":"ok"}"><span>${c.bad.length ? "✗" : "✓"}</span><b>${esc(c.k)}</b><span class="muted">${c.bad.length ? `被禁 ${c.bad.length} 人：${c.bad.map(esc).join("、")}` : `${c.n} 人都能用`}</span><span style="flex:1"></span><button data-plib="${esc(c.k)}">载入</button></div>`).join("");
+  }
+  planCache = {key, html};
+  $("planOut").innerHTML = html;
+}
+let planRows = [];
+function loadPlanTeam(team){
+  if ([...S.field, ...S.bench].some(Boolean) && !confirm("用这套推荐替换当前阵容？当前阵容没保存的改动会丢失。")) return;
+  const L = emptyLineup();
+  team.forEach((n,i) => L.field[i] = {name:n, elite:false, equips:[]});
+  if (PLAN.boss){ L.boss.name = PLAN.boss; L.boss.mode = PLAN.mode; }
+  S = L; selected = null; refreshSaved(); render(); if (isPhone()) setView("board"); toast("已载入推荐阵容");
+}
+$("tab-plan").addEventListener("click", e => {
+  const t = e.target;
+  const pb = t.closest("[data-pban]");
+  if (pb){ const [kind, b] = pb.dataset.pban.split(":"); const a = PLAN[kind];
+    if (a.includes(b)) a.splice(a.indexOf(b), 1); else { if (a.length >= 5) return toast("每局最多禁 5 个"); a.push(b); }
+    savePlan(); renderPlan(); return; }
+  const pw = t.closest("[data-pwave]"); if (pw){ PLAN.waves.push(pw.dataset.pwave); savePlan(); renderPlan(); return; }
+  const pd = t.closest("[data-pwdel]"); if (pd){ PLAN.waves.splice(+pd.dataset.pwdel, 1); savePlan(); renderPlan(); return; }
+  if (t.closest("[data-preset]")){ if (!confirm("清空禁用盟约、首领和波次？")) return; PLAN = {...DEFAULT_PLAN, banCore:[], banSub:[], waves:[]}; savePlan(); renderPlan(); return; }
+  const pl = t.closest("[data-pload]"); if (pl){ const r = planRows[+pl.dataset.pload]; if (r) loadPlanTeam(r.team); return; }
+  const lb = t.closest("[data-plib]"); if (lb){ const k = lb.dataset.plib; S = normalize(savedAll()[k]); selected = null; refreshSaved(k); render(); if (isPhone()) setView("board"); toast("已载入：" + k); }
+});
+$("tab-plan").addEventListener("change", e => {
+  const s = e.target.closest("[data-pk]"); if (!s) return;
+  PLAN[s.dataset.pk] = s.value; savePlan(); renderPlan();
+});
+
 function render(){
   const state = compute();
   lastState = state;
-  renderBoard(state); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); markUsed(); renderDetail();
+  renderBoard(state); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); renderPlan(); markUsed(); renderDetail();
   $("deploy9").checked = S.deploy9;
   $("lineupName").value = S.name;
   autosave();
@@ -1328,7 +1635,7 @@ $("showAll").addEventListener("change", render);
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest("[data-tab]"); if (!b) return;
   document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x===b));
-  ["bonds","layers","dps"].forEach(t => $("tab-"+t).hidden = t !== b.dataset.tab);
+  ["bonds","layers","dps","plan"].forEach(t => $("tab-"+t).hidden = t !== b.dataset.tab);
   render();
 });
 // 层数面板
