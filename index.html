@@ -44,6 +44,17 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 #poolGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:6px;max-height:calc(100vh - 250px);overflow:auto;padding-right:4px}
 .tile{position:relative;cursor:pointer;text-align:center;border-radius:6px;padding:2px;background:var(--panel2);border:1px solid transparent}
 .tile:hover{border-color:var(--accent)}
+.tile .so{position:absolute;right:2px;top:2px;font-size:9px;padding:0 3px;border-radius:3px;background:#3a2a10;color:var(--t5);border:1px solid var(--t5);line-height:13px}
+.srow{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:13px}
+.srow label{display:flex;gap:6px;align-items:center;font-weight:bold;white-space:nowrap;flex:none}
+.srow select{max-width:180px;font-weight:normal}
+#stratEff{font-size:12px;line-height:1.45;flex:1;min-width:0;max-height:2.9em;overflow:hidden;cursor:pointer}
+#stratEff.open{max-height:none}
+#stratEff b,.pse b{color:var(--text)}
+#stratWarn,.pl .warn{color:#ff9b7d}#stratWarn{font-size:12px;margin:-4px 0 8px}
+.pse{font-size:12px;line-height:1.45;color:var(--muted);margin-top:6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.sb{font-size:11px;padding:1px 6px;border-radius:4px;background:#3a2a10;color:var(--t5);border:1px solid var(--t5);margin-left:6px}
+@media (max-width:760px){.srow{flex-direction:column;gap:4px}.srow label{width:100%}.srow select{max-width:none;flex:1}}
 .tile.wild{border:1px dashed #5d7680}
 .fillc{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .fillc button{display:flex;gap:4px;align-items:center;padding:2px 6px 2px 2px;font-size:12px;border-left:3px solid var(--tc)}
@@ -335,6 +346,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 
   <section id="boardSec">
     <div class="panel">
+      <div class="srow" id="stratRow"><label>策略<select id="stratSel"></select></label><div class="muted" id="stratEff"></div></div><div class="warn" id="stratWarn" hidden></div>
       <div class="zone-h"><b>战场</b><span class="muted" id="fieldCount"></span><span style="flex:1"></span>
         <div class="seg" id="stSeg" title="每个阵容有过渡、终局两套站位，盟约和计算按当前阶段"><button type="button" data-st="过渡">过渡</button><button type="button" data-st="终局">终局</button></div>
         <div class="seg" id="bvSeg" title="简洁版只显示头像和盟约，点头像进入完整版"><button type="button" data-bv="1">简洁</button><button type="button" data-bv="0">完整</button></div></div>
@@ -409,6 +421,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 <script src="stats.js"></script>
 <script src="bosses.js"></script>
 <script src="enemies.js"></script>
+<script src="strategies.js"></script>
 <script src="calc.js"></script>
 <script>
 "use strict";
@@ -422,6 +435,14 @@ D.bonds.forEach(b => { if (b.name === "绝技") return; OPS[WILD(b.name)] = {tie
   trait:`代表任意一名拥有【${b.name}】盟约的干员：计入盟约人数，不计算属性和输出。拿到具体干员后，在明细里点选或直接拖到这张卡上替换（保留装备和精锐状态）。`}; });
 const isWild = u => !!(u && OPS[u.name] && OPS[u.name].wild);
 const BONDS = {}; D.bonds.forEach(b => BONDS[b.name] = b);
+// 策略（PRTS 61 个）；STRAT_ONLY = 只能通过某个策略获得的干员（商店买不到）
+const STRATS = window.STRATS || [], STRAT = {}, STRAT_ONLY = {};
+STRATS.forEach(x => { STRAT[x.name] = x; if (x.op) STRAT_ONLY[x.op] = x.name; });
+const STRAT_CATS = [["盟约","核心盟约相关"],["战斗","直接影响战斗（已计入计算）"],["干员","获得特殊干员"],["运营","经济 / 操作"]];
+function stratOptions(cur){
+  return `<option value="">（不选策略）</option>` + STRAT_CATS.map(([c, lbl]) => `<optgroup label="${lbl}">${STRATS.filter(x => x.cat === c).map(x => `<option value="${esc(x.name)}"${x.name===cur?" selected":""}>${esc(x.name)}${x.bond ? `（${esc(x.bond)}）` : ""}</option>`).join("")}</optgroup>`).join("");
+}
+const stratEffHTML = n => { const x = STRAT[n]; return x ? `<b>${esc(x.name)}</b> · ${esc(x.by)} · 目标生命 ${x.hp}${x.unlock ? ` · 解锁：${esc(x.unlock)}` : ""}<br>${esc(x.eff).replace(/ \/ /g, "<br>")}` : ""; };
 const EQUIP = {}; D.equipment.forEach(e => EQUIP[e.name] = e);
 const CORE = D.bonds.filter(b => b.category === "核心盟约").map(b => b.name);
 const BENCH_COUNTS = new Set(["远见","奇迹","投资人"]);   // 整备区也可用于激活
@@ -455,7 +476,7 @@ const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
 const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
 const DEFAULT_RECO = {tier:6, pick:"", all:false};
-function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}, stage:"终局", alt:{field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null)}}; }
+function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}, stage:"终局", alt:{field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null)}, strat:""}; }
 const STAGES = ["过渡","终局"], otherStage = st => st === "过渡" ? "终局" : "过渡";
 let S = emptyLineup();
 let selected = null; // {zone, idx}
@@ -470,6 +491,7 @@ function normalize(L){
   n.boss = {...DEFAULT_BOSS, ...(L.boss||{})}; n.boss.opts = {...(n.boss.opts||{})};
   n.round = {...DEFAULT_ROUND, ...(L.round||{})};
   n.reco = {...DEFAULT_RECO, ...(L.reco||{})};
+  n.strat = STRAT[L.strat] ? L.strat : "";
   n.round.rows = (n.round.rows||[]).filter(x => x && ENEMIES.enemies[x.name]).map(x => ({name:x.name, n:Math.max(0, +x.n||0), lv:+x.lv||0, hp:x.hp ?? ""}));
   const fix = u => {
     if (!u || !OPS[u.name]) return null;
@@ -567,7 +589,7 @@ function renderPool(){
       <div class="nm">任意【${esc(bf)}】</div>
     </div>` : "") + list.map(o => `
     <div class="tile ${used.has(o.name)?"used":""}" draggable="true" data-op="${esc(o.name)}" style="--tc:${TC[o.tier]}">
-      <span class="tb">${o.tier}</span>
+      <span class="tb">${o.tier}</span>${STRAT_ONLY[o.name] ? `<span class="so" title="商店买不到，只能通过策略「${esc(STRAT_ONLY[o.name])}」获得${o.name==="“暴躁铁皮”"?"（之后可对它用简易电话再拿一个）":""}">策略</span>` : ""}
       <img src="${avatar(o.name)}" alt="" loading="lazy">
       <div class="nm">${esc(o.name)}</div>
     </div>`).join("");
@@ -657,7 +679,7 @@ function renderBonds(state){
   }).join("") || `<div class="muted">战场上还没有干员</div>`;
 }
 let lastState = null;
-const ctxFor = state => ({state, layersOf, OPS, EQUIP, D, unitBonds, calc:S.calc});
+const ctxFor = state => ({state, layersOf, OPS, EQUIP, D, unitBonds, calc:S.calc, strat:STRAT[S.strat] || null});
 const f0 = v => Math.round(v).toLocaleString("en-US");
 const f2 = v => (Math.round(v*100)/100).toString();
 const TYPE_CN = {phys:"物理", magic:"法术", true:"真实", heal:"治疗"};
@@ -1043,6 +1065,7 @@ const RULES_HTML = `
   <li><b>简洁 / 完整</b>：战场右上角切换。简洁版只显示头像和盟约汇总（已激活的、差 1~2 人的），点头像回到完整版并打开该干员明细。<b>阵容库</b>（顶部按钮 / 手机底栏）用简洁版列出所有保存的阵容，可直接载入或删除。</li>
   <li><b>过渡 / 终局</b>：战场右上角切换。每个阵容有两套站位，盟约、DPS、装备推荐都按当前阶段计算，保存和阵容库会同时保留两套。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
+  <li><b>策略</b>：战场上方选本阵容的策略。战斗类（众志合一、统御号令、以己之长、食腐之蝶）直接计入盟约 / 伤害计算，食腐之蝶默认不开，需要在效果里勾上；盟约类策略在对局规划里优先推荐对应核心盟约。“暴躁铁皮”和盟约·辅助干员商店买不到（干员池里标「策略」），只有选了对应策略（暴躁铁皮 / 优等生）才会出现在推荐里。</li>
   <li><b>对局规划</b>（盟约 / 计算 → 对局规划）：填本局禁用的核心盟约（≤5）、附加盟约（≤5）、首领和每波敌人特点。禁用规则：带任一被禁核心盟约的干员不出现；其他干员要全部盟约都被禁才不出现；被禁的盟约按无法激活处理。每个未被禁的核心盟约各给一套过渡阵容（阶级和人数可调，默认 ≤Ⅲ 阶 6 人，尽量沿用终局里的人）和终局 8 人阵容，可一键载入两个阶段；按盟约、波次需求（飞行要远程、隐匿要近战、元素/持续要医疗、致命/特异要重装……）、代入盟约后的全队 DPS 和首领击杀时间排序；不含装备和精锐。「按目标盟约找阵容」：点盟约切换要求的档位（如叙拉古Ⅱ + 坚守Ⅰ），搜索刚好达成所有目标的最少干员组合，剩下的位置给出补位建议（虚线框）；勾选「保留当前战场干员」可在已有阵容上补齐。下方还会列出已保存的阵容本局能不能用。本局信息单独保存，换阵容不会清掉。</li>
   <li><b>推荐装备</b>（战场下方）：分「长期装备」和「一次性道具」两组。长期装备逐件试给每名场上非治疗干员（有空栏就加，满栏试替换一件，不动变形同构体及其对应装备），按该干员 x 秒平均 DPS 提升排序；卫戍推荐信/多功能补剂按“已激活盟约 +3 层”后全队 DPS 提升选人；已带组合装备一半的提示另一半；变形同构体只在某盟约差 1 人到下一档时推荐。一次性道具：随身身份牌按 +3 层全队收益；简易通讯机/寻呼模块/人事部记录选第一盟约离下一档最近的干员；博士投影选晋升精锐后全队 DPS 涨得最多的；信标选拿掉后掉盟约最少、输出最低的；资金/商店类与携带者无关。可用“商店等级”过滤。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
@@ -1146,7 +1169,7 @@ function recoFirstBond(state){
   return [...by.values()].sort((a,b) => (a.need ?? 99) - (b.need ?? 99) || b.core - a.core || b.n - a.n);
 }
 
-const recoKey = () => JSON.stringify([S.field.slice(0, fieldCap()), S.bench, S.layers, S.temp, S.calc, S.reco, S.deploy9]);
+const recoKey = () => JSON.stringify([S.field.slice(0, fieldCap()), S.bench, S.layers, S.temp, S.calc, S.reco, S.deploy9, S.strat]);
 let recoTimer = null;
 // 阵容变化后稍等再算（几百次求值），不卡拖拽/点击
 function renderReco(){
@@ -1286,7 +1309,7 @@ WAVE_TAGS.forEach(t => {
   const m = k => L.length ? L.reduce((a,x) => a + (+x[k]||0), 0) / L.length : 0;
   WAVE_AVG[t] = {hp:m("hp"), def:m("def"), res:m("res"), n:L.length};
 });
-const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟", tTier:3, tN:6, goals:{}, gTier:6, gLock:false};
+const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟", tTier:3, tN:6, goals:{}, gTier:6, gLock:false, strat:""};
 let PLAN = {...DEFAULT_PLAN, ...store.get("wsxy-plan", {})};
 const savePlan = () => store.set("wsxy-plan", PLAN);
 
@@ -1312,11 +1335,11 @@ const planBoss = () => BOSSES.list.find(b => b.name === PLAN.boss) || null;
 let featCache = {key:"", F:null};
 function opFeatures(){
   const en = waveEnemy(), B = planBoss();
-  const key = JSON.stringify([en, B && B.name, S.calc.x, S.calc.trust]);
+  const key = JSON.stringify([en, B && B.name, S.calc.x, S.calc.trust, PLAN.strat]);
   if (featCache.key === key) return featCache.F;
   const F = {};
   withTemp(() => { S.field = Array(9).fill(null); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
-    const base = ctxFor(st);
+    const base = {...ctxFor(st), strat:STRAT[PLAN.strat] || null};
     const ctxW = {...base, calc:{...S.calc, def:en.def, res:en.res, targets:1}};
     const ctxB = B ? {...base, calc:{...S.calc, def:B.def, res:B.res, targets:1}} : null;
     D.operators.forEach(o => {
@@ -1345,7 +1368,7 @@ const BI = {}; D.bonds.forEach((b,i) => BI[b.name] = i);
 const tierOf = n => TIERS.indexOf(OPS[n].tier) + 1;
 function planModel(){
   const F = opFeatures(), B = planBoss();
-  const avail = D.operators.filter(o => !opBanned(o.name)).map(o => o.name);
+  const avail = D.operators.filter(o => !opBanned(o.name) && (!STRAT_ONLY[o.name] || PLAN.strat === STRAT_ONLY[o.name])).map(o => o.name);
   const wc = {}; PLAN.waves.forEach(t => wc[t] = (wc[t]||0) + 1);
   const w = t => wc[t] ? 1 + 0.3 * (wc[t] - 1) : 0;
   const refraction = PLAN.waves.length ? (wc["折射"]||0) / PLAN.waves.length : 0;
@@ -1382,10 +1405,12 @@ function planModel(){
     }
     return L;
   }
+  const zhong = PLAN.strat === "众志合一";
   function score(team, ci){
     const L = levels(team); let s = 0;
     for (let i = 0; i < L.length; i++) if (L[i]) s += coreIdx.has(i) ? 6 + 5 * (L[i] - 1) : 3 + 2 * (L[i] - 1);
     if (ci >= 0 && !L[ci]) s -= 100;
+    if (zhong){ let n = 0; for (let i = 0; i < L.length; i++) if (L[i]) n++; s += n >= 5 ? 6 : n >= 4 ? 4.5 : n >= 3 ? 3 : 0; }
     let ranged = 0, melee = 0, heal = 0, tank = 0, fast = 0;
     team.forEach(n => { const f = F[n]; s += V[n];
       if (f.ranged && !f.heal && f.dmg > 0) ranged++; if (f.melee) melee++; if (f.heal) heal++; if (f.tank) tank++;
@@ -1490,15 +1515,16 @@ function goalSearch(M){
 // 用真实盟约效果算一遍：全队 DPS（对波次平均敌人）+ 首领击杀时间
 function planEval(team, withBoss = true){
   const en = waveEnemy(), B = planBoss();
-  const calc0 = S.calc, boss0 = S.boss, d9 = S.deploy9;
+  const calc0 = S.calc, boss0 = S.boss, d9 = S.deploy9, st0 = S.strat;
   try {
+    S.strat = PLAN.strat || "";
     S.calc = {...S.calc, def:en.def, res:en.res}; S.deploy9 = team.length > 8;
     return withTemp(() => { S.field = Array(9).fill(null); team.forEach((n,i) => S.field[i] = {name:n, elite:false, equips:[]}); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
       const r = {dps:teamAvg(st), res:st.res, kill:null};
       if (B && withBoss){ S.boss = {...DEFAULT_BOSS, opts:{}, name:B.name, mode:PLAN.mode}; const R = bossSim(st, 1, 600); r.kill = R ? R.kill : null; }
       return r;
     });
-  } finally { S.calc = calc0; S.boss = boss0; S.deploy9 = d9; }
+  } finally { S.calc = calc0; S.boss = boss0; S.deploy9 = d9; S.strat = st0; }
 }
 
 function waveChecks(team, F){
@@ -1537,6 +1563,8 @@ function renderPlanInputs(){
     <div class="ph">禁用核心盟约 <small>${PLAN.banCore.length}/5</small></div><div class="pbs">${CORE.map(b => chip(b, "banCore")).join("")}</div>
     <div class="ph">禁用附加盟约 <small>${PLAN.banSub.length}/5</small></div><div class="pbs">${SUBS.map(b => chip(b, "banSub")).join("")}</div>
     <div class="pgr"><label>首领<select data-pk="boss">${bossOpts}</select></label><label>难度 / 规程等级<select data-pk="mode">${modeOpts}</select></label></div>
+    <div class="pgr" style="grid-template-columns:1fr"><label>本局策略<select data-pk="strat">${stratOptions(PLAN.strat)}</select></label></div>
+    ${PLAN.strat ? `<div class="pse">${stratEffHTML(PLAN.strat)}</div>` : ""}
     <div class="ph">每波敌人特点 <small>按顺序点选，可重复</small></div>
     <div class="pbs">${WAVE_TAGS.map(t => `<button type="button" class="pb" data-pwave="${t}" title="${esc(WAVE_INFO[t]?.d||"")}">+ ${t}</button>`).join("")}</div>
     <div class="pws">${PLAN.waves.length ? PLAN.waves.map((t,i) => `<span>第${i+1}波 <b>${t}</b><button type="button" data-pwdel="${i}" title="移除">×</button></span>`).join("") : `<span class="muted" style="border:0;background:none">还没有添加波次</span>`}</div>
@@ -1579,7 +1607,8 @@ function buildPlan(){
   // ---- 每个核心盟约：过渡 + 终局 ----
   const rows = list.filter(x => x.team).map(x => ({...x, ev:planEval(x.team), tev:x.trans ? planEval(x.trans, false) : null}));
   const maxD = Math.max(1, ...rows.map(x => x.ev.dps)), kills = rows.map(x => x.ev.kill).filter(k => k != null), bestK = kills.length ? Math.min(...kills) : 0;
-  rows.forEach(x => x.rank = x.score + 6 * x.ev.dps / maxD + (B && x.ev.kill != null ? 6 * bestK / x.ev.kill : 0));
+  const SB = STRAT[PLAN.strat] && STRAT[PLAN.strat].bond;
+  rows.forEach(x => x.rank = x.score + 6 * x.ev.dps / maxD + (B && x.ev.kill != null ? 6 * bestK / x.ev.kill : 0) + (SB === x.core ? 8 : 0));
   rows.sort((a,b) => b.rank - a.rank);
   html += `<h3 class="psh">推荐阵容 <small>每个核心盟约一套：过渡（≤ ${TIERS[(+PLAN.tTier||3)-1]} 阶 · ${PLAN.tN} 人）→ 终局（8 人）；按盟约、波次需求、全队输出${B ? "和首领击杀时间" : ""}排序</small></h3>`;
   html += rows.map((x, i) => {
@@ -1587,7 +1616,7 @@ function buildPlan(){
     const spare = x.own.filter(n => !x.team.includes(n));
     const fin = new Set(x.team);
     return `<div class="libc pc">
-      <div class="lh">${i===0?'<span class="best">首选</span>':""}<b>${esc(x.core)}</b><span style="flex:1"></span><button class="primary" data-pload="${i}">载入过渡 + 终局</button></div>
+      <div class="lh">${i===0?'<span class="best">首选</span>':""}<b>${esc(x.core)}</b>${SB === x.core ? `<span class="sb">策略「${esc(PLAN.strat)}」</span>` : ""}<span style="flex:1"></span><button class="primary" data-pload="${i}">载入过渡 + 终局</button></div>
       ${x.trans ? `<div class="stl">过渡 <span class="muted">DPS ${f0(x.tev.dps)} · 带到终局的 ${x.trans.filter(n => fin.has(n)).length} 人</span></div>${teamRow(x.trans, fin)}${bondsRow(x.tev.res)}`
         : `<div class="stl">过渡 <span class="muted">≤ ${TIERS[(+PLAN.tTier||3)-1]} 阶的【${esc(x.core)}】干员不足 ${THRESH[x.core][0]} 人，凑不出过渡阵容</span></div>`}
       <div class="stl">终局 <span class="muted">DPS ${f0(x.ev.dps)}${kill ? " · " + kill : ""}</span></div>
@@ -1613,8 +1642,9 @@ function buildPlan(){
     const chk = ks.map(k => { const L = all[k], A = L.alt || {};
       const units = [...(L.field||[]), ...(L.bench||[]), ...(A.field||[]), ...(A.bench||[])].filter(u => u && OPS[u.name]);
       const bad = [...new Set(units.filter(u => opBanned(u.name)).map(u => u.name))];
-      return {k, bad, n:new Set(units.map(u => u.name)).size}; }).sort((a,b) => a.bad.length - b.bad.length);
-    html += `<h3 class="psh">我的阵容本局可用吗</h3>` + chk.map(c => `<div class="pl ${c.bad.length?"bad":"ok"}"><span>${c.bad.length ? "✗" : "✓"}</span><b>${esc(c.k)}</b><span class="muted">${c.bad.length ? `被禁 ${c.bad.length} 人：${c.bad.map(esc).join("、")}` : `${c.n} 人都能用`}</span><span style="flex:1"></span><button data-plib="${esc(c.k)}">载入</button></div>`).join("");
+      const need = [...new Set(units.filter(u => STRAT_ONLY[u.name] && STRAT_ONLY[u.name] !== PLAN.strat).map(u => u.name))];
+      return {k, bad, need, n:new Set(units.map(u => u.name)).size}; }).sort((a,b) => a.bad.length - b.bad.length || a.need.length - b.need.length);
+    html += `<h3 class="psh">我的阵容本局可用吗</h3>` + chk.map(c => `<div class="pl ${c.bad.length?"bad":"ok"}"><span>${c.bad.length ? "✗" : "✓"}</span><b>${esc(c.k)}</b><span class="muted">${c.bad.length ? `被禁 ${c.bad.length} 人：${c.bad.map(esc).join("、")}` : `${c.n} 人都能用`}${c.need.length ? `<span class="warn">；${c.need.map(n => `${esc(n)} 要先拿策略「${esc(STRAT_ONLY[n])}」`).join("、")}</span>` : ""}</span><span style="flex:1"></span><button data-plib="${esc(c.k)}">载入</button></div>`).join("");
   }
   planCache = {key, html};
   $("planOut").innerHTML = html;
@@ -1623,7 +1653,7 @@ const unitsOf = team => { const f = Array(9).fill(null); team.forEach((n,i) => f
 function loadPlanTeam(r){
   if ([...S.field, ...S.bench, ...S.alt.field, ...S.alt.bench].some(Boolean) && !confirm("用这套推荐替换当前阵容（过渡和终局两个阶段）？没保存的改动会丢失。")) return;
   const L = emptyLineup();
-  L.name = `${r.core}（推荐）`;
+  L.name = `${r.core}（推荐）`; L.strat = PLAN.strat || "";
   if (r.trans){ L.stage = "过渡"; L.field = unitsOf(r.trans); L.alt.field = unitsOf(r.team); }
   else { L.stage = "终局"; L.field = unitsOf(r.team); }
   if (PLAN.boss){ L.boss.name = PLAN.boss; L.boss.mode = PLAN.mode; }
@@ -1663,7 +1693,7 @@ $("tab-plan").addEventListener("change", e => {
 function render(){
   const state = compute();
   lastState = state;
-  renderBoard(state); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); renderPlan(); markUsed(); renderDetail();
+  renderStrat(); renderBoard(state); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); renderPlan(); markUsed(); renderDetail();
   $("deploy9").checked = S.deploy9;
   $("lineupName").value = S.name;
   autosave();
@@ -1749,6 +1779,16 @@ $("tierbar").addEventListener("click", e => { const b = e.target.closest("button
   });
 });
 
+function renderStrat(){
+  const sel = $("stratSel");
+  if (!sel.options.length || sel.value !== S.strat) sel.innerHTML = stratOptions(S.strat);
+  const only = [...S.field, ...S.bench, ...S.alt.field, ...S.alt.bench].filter(u => u && STRAT_ONLY[u.name] && STRAT_ONLY[u.name] !== S.strat).map(u => u.name);
+  $("stratEff").innerHTML = S.strat ? stratEffHTML(S.strat) : "战斗类策略会计入盟约和伤害计算；盟约类策略在对局规划里优先对应的核心盟约。";
+  $("stratWarn").hidden = !only.length;
+  $("stratWarn").textContent = only.length ? `⚠ ${[...new Set(only)].map(n => `${n} 商店买不到，要选策略「${STRAT_ONLY[n]}」`).join("；")}` : "";
+}
+$("stratSel").addEventListener("change", e => { S.strat = e.target.value; render(); });
+$("stratEff").addEventListener("click", () => $("stratEff").classList.toggle("open"));
 function switchStage(st){
   if (st === S.stage) return;
   const a = S.alt; S.alt = {field:S.field, bench:S.bench}; S.field = a.field; S.bench = a.bench; S.stage = st;
@@ -1965,7 +2005,7 @@ function libCardHTML(k, L){
   const main = parts.find(p => p.st === N.stage) || parts[0];
   const fN = main ? main.B.field.slice(0, cap).filter(Boolean).length : 0;
   return `<div class="libc ${k===S.name?"cur":""}">
-    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">${two ? "过渡 + 终局" : `场上 ${fN}/${cap}`}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
+    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">${two ? "过渡 + 终局" : `场上 ${fN}/${cap}`}${N.strat ? ` · 策略「${esc(N.strat)}」` : ""}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
       <button class="primary" data-lload="${esc(k)}">载入</button><button data-ldel="${esc(k)}">删除</button></div>
     ${body || '<span class="muted" style="font-size:12px">空阵容</span>'}
   </div>`;

@@ -247,6 +247,25 @@ function unitEffects(u, pos, ctx){
     const basic = parts.filter(p => !/^【进阶】/.test(p)).join(" / ");
     add(`eq:${i}:${e}`, `装备「${e}」`, basic, {scope: seg => /左右两侧的我方干员/.test(seg) ? true : true});
   });
+  // 2.5 策略（只算直接影响战斗的被动策略）
+  if (ctx.strat && pos.zone === "field"){
+    const SN = ctx.strat.name, srcL = `策略「${SN}」`;
+    const sAdd = (text, mods, cond) => { const m = Object.assign(emptyMods(), mods);
+      list.push({key:"strat:" + SN, src:srcL, text, items:[{m, cond:!!cond, skillOnly:false, desc:text}], cond:!!cond}); };
+    if (SN === "众志合一"){
+      const n = Object.keys(st).filter(k => st[k] && st[k].level > 0).length;
+      const p = n >= 5 ? 40 : n >= 4 ? 30 : n >= 3 ? 20 : 0;
+      if (p) sAdd(`场上 ${n} 种激活盟约：攻击力、生命上限 +${p}%`, {atkP:p, hpP:p});
+    } else if (SN === "统御号令"){
+      const n = (st["绝技"] || {}).count || 0;
+      if (u.elite && n) sAdd(`场上 ${n} 名精锐干员：攻击力、生命上限 +${10 * n}%`, {atkP:10 * n, hpP:10 * n});
+    } else if (SN === "以己之长"){
+      sAdd("物理 / 法术伤害变为弱点伤害（取较高者）", {weak:true});
+      if (u.elite) sAdd("精锐：攻击力 +16%，攻击速度 +16", {atkP:16, aspd:16});
+    } else if (SN === "食腐之蝶"){
+      sAdd("我方每有 1 名干员被击倒，攻击力 +20%（这里按 1 名算，最多 +200%）", {atkP:20}, true);
+    }
+  }
   // 3. 卫戍特质
   const trait = u.elite && o.trait_elite ? o.trait_elite : o.trait;
   if (trait) add("trait", u.elite ? "精锐特质" : "特质", trait);
