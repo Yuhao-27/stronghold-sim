@@ -1,0 +1,1015 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>卫戍阵容模拟器</title>
+<meta name="theme-color" content="#0f1417">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="卫戍模拟">
+<style>
+:root{
+  --bg:#0f1417; --panel:#161d21; --panel2:#1d262b; --line:#2a363c; --text:#e6ecee; --muted:#8a9aa1;
+  --accent:#08d8a5; --accent2:#115959; --warn:#ff6237; --blue:#0098dc;
+  --t1:#9aa3a7; --t2:#7cc35f; --t3:#3d9be9; --t4:#ad73ee; --t5:#f0b429; --t6:#ff6a3d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Microsoft YaHei","PingFang SC",system-ui,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent2);border-color:var(--accent)}
+input[type=text],input[type=number],select{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:linear-gradient(90deg,#131b1c 0%,#115959 60%,#0a8f70 100%);position:sticky;top:0;z-index:20}
+header h1{font-size:18px;margin:0 12px 0 0;white-space:nowrap}
+header .grow{flex:1}
+header label{display:flex;gap:6px;align-items:center;white-space:nowrap}
+main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;padding:12px 16px;align-items:start}
+@media (max-width:1250px){main{grid-template-columns:300px minmax(0,1fr)}#bondPanel{grid-column:1/-1}}
+@media (max-width:760px){main{grid-template-columns:1fr;padding:12px}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.panel h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.panel h2 small{color:var(--muted);font-weight:normal}
+.muted{color:var(--muted)}
+/* pool */
+#pool .filters{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.tierbar{display:flex;gap:4px;flex-wrap:wrap}
+.tierbar button{padding:2px 9px}
+.tierbar button.on{background:var(--accent2);border-color:var(--accent)}
+#poolGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:6px;max-height:calc(100vh - 250px);overflow:auto;padding-right:4px}
+.tile{position:relative;cursor:pointer;text-align:center;border-radius:6px;padding:2px;background:var(--panel2);border:1px solid transparent}
+.tile:hover{border-color:var(--accent)}
+.tile img{width:100%;aspect-ratio:1;display:block;border-radius:4px;border-bottom:3px solid var(--tc)}
+.tile .nm{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .tb{position:absolute;top:2px;left:2px;font-size:10px;padding:0 4px;border-radius:3px;background:var(--tc);color:#111;font-weight:bold}
+.tile.used::after{content:"✓";position:absolute;top:2px;right:4px;color:var(--accent);font-weight:bold;text-shadow:0 0 3px #000}
+/* board */
+.zone-h{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.zone-h b{font-size:15px;white-space:nowrap}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.slot{min-height:150px;border:1px dashed var(--line);border-radius:8px;background:#121a1d;position:relative}
+.slot.over{border-color:var(--accent);background:#14302a}
+.slot.empty::before{content:"空位";position:absolute;inset:0;display:grid;place-items:center;color:#3f4d53}
+.card{padding:6px;height:100%;border-radius:8px;border:1px solid var(--line);background:var(--panel2);cursor:grab;display:flex;flex-direction:column;gap:4px;border-top:3px solid var(--tc)}
+.card.sel{outline:2px solid var(--accent)}
+.card .top{display:flex;gap:6px}
+.card img.av{width:52px;height:52px;border-radius:5px;flex:none}
+.card .nm{font-weight:bold;font-size:13px;line-height:1.2;word-break:break-all}
+.card .meta{font-size:11px;color:var(--muted)}
+.card .ctrl{display:flex;gap:4px;margin-top:3px}
+.card .ctrl button{padding:0 6px;font-size:12px}
+.elite-on{background:#5b4410!important;border-color:var(--t5)!important;color:var(--t5)}
+.chips{display:flex;flex-wrap:wrap;gap:3px}
+.chip{font-size:11px;padding:0 5px;border-radius:3px;background:#24343a;border:1px solid #2f4750;white-space:nowrap}
+.chip.core{background:#163a33;border-color:#1f6b5a}
+.chip.iso{background:#3a2a10;border-color:var(--t5);color:var(--t5)}
+.chip.on{box-shadow:inset 0 0 0 1px var(--accent)}
+.equips{display:flex;gap:3px;flex-wrap:wrap}
+.eq{font-size:11px;padding:1px 5px;border-radius:4px;border:1px dashed #3a4b52;color:var(--muted);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.eq.has{border-style:solid;color:var(--text);background:#22303a}
+.eq.iso{border-color:var(--t5);color:var(--t5)}
+/* detail */
+#detail .row{margin:6px 0}
+#detail .trait{background:#121a1d;border-radius:6px;padding:6px 8px;margin:4px 0}
+#detail .trait.active{border-left:3px solid var(--accent)}
+/* bonds */
+#bondList{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 170px);overflow:auto;padding-right:4px}
+@media (max-width:1250px){#bondList{max-height:none}}
+.bond{border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--panel2)}
+.bond.lv0{opacity:.62}
+.bond.lv1{border-color:#1f6b5a}
+.bond.lv2{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.bond .bh{display:flex;align-items:center;gap:6px}
+.bond .bh b{font-size:14px}
+.bond .cat{font-size:11px;color:var(--muted)}
+.pips{display:flex;gap:2px;margin-left:auto;align-items:center}
+.pip{width:9px;height:9px;border-radius:2px;background:#33444b}
+.pip.f{background:var(--accent)}
+.pip.th{outline:1px solid var(--t5);outline-offset:1px}
+.cnt{font-variant-numeric:tabular-nums;font-weight:bold;margin-left:6px;white-space:nowrap}
+.status{font-size:11px;padding:0 6px;border-radius:10px;background:#33444b}
+.lv1 .status{background:#1f6b5a}
+.lv2 .status{background:var(--accent);color:#06261d}
+.mem{display:flex;gap:3px;flex-wrap:wrap;margin:6px 0 4px}
+.mem img{width:26px;height:26px;border-radius:4px;border-bottom:2px solid var(--tc)}
+.mem img.iso{outline:2px solid var(--t5)}
+.mem img.bench{opacity:.55}
+.eff{font-size:12px;color:#c7d3d7}
+.eff div{margin:2px 0}
+.eff div.off{color:#5f7077}
+.eff b.v{color:var(--blue)}
+.layer{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:4px;color:var(--muted)}
+.layer input{width:70px;padding:1px 6px}
+.note{font-size:12px;color:var(--t5);margin-top:3px}
+/* modal */
+#modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal.show{display:flex}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(760px,100%);max-height:86vh;display:flex;flex-direction:column}
+#modal .mh{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--line)}
+#modal .mb{overflow:auto;padding:12px}
+.eqitem{padding:6px 8px;border-radius:6px;border:1px solid var(--line);margin-bottom:6px;cursor:pointer;background:var(--panel2)}
+.eqitem:hover{border-color:var(--accent)}
+.eqitem .en{font-weight:bold}
+.eqitem .tag{font-size:11px;color:var(--t5);margin-left:6px}
+.eqitem .ee{font-size:12px;color:var(--muted)}
+#tip{position:fixed;pointer-events:none;z-index:60;background:#0b1013;border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:340px;font-size:12px;display:none}
+.tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.tabs button{padding:4px 12px}
+.tabs button.on{background:var(--accent2);border-color:var(--accent)}
+.lyr{display:grid;grid-template-columns:auto 1fr;gap:4px 8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);margin-bottom:6px}
+.lyr.act{border-color:#1f6b5a}
+.lyr .ln{font-weight:bold;white-space:nowrap}
+.lyr .lc{display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.lyr .lc button{padding:0 6px;font-size:12px}
+.lyr .lc input{width:64px;padding:1px 6px;text-align:right}
+.lyr .ms{grid-column:1/-1;display:flex;gap:3px;flex-wrap:wrap}
+.ms span{font-size:11px;padding:0 5px;border-radius:3px;background:#24343a;color:var(--muted)}
+.ms span.ok{background:#163a33;color:var(--accent)}
+.calc h3{font-size:14px;margin:12px 0 6px;border-top:1px solid var(--line);padding-top:10px}
+.calc table{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+.calc th,.calc td{padding:3px 6px;border-bottom:1px solid #223036;text-align:right}
+.calc th:first-child,.calc td:first-child{text-align:left}
+.calc .big{display:flex;gap:8px;flex-wrap:wrap}
+.calc .big div{background:#121a1d;border-radius:8px;padding:6px 10px;min-width:96px}
+.calc .big b{display:block;font-size:18px;color:var(--accent)}
+.calc .big span{font-size:11px;color:var(--muted)}
+.calc .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px}
+.calc .grid label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.calc .grid input,.calc .grid select{width:100%}
+.effrow{display:flex;gap:6px;align-items:flex-start;padding:4px 6px;border-radius:6px;background:#121a1d;margin:3px 0;font-size:12px}
+.effrow.cond{border-left:3px solid var(--t5)}
+.effrow.off{opacity:.5}
+.effrow .es{color:var(--muted);white-space:nowrap}
+.effrow .ep{color:var(--blue)}
+.tag-c{font-size:10px;padding:0 4px;border-radius:3px;background:#5b4410;color:var(--t5);margin-left:4px}
+#dpsTable td,#dpsTable th,#bossBox td,#bossBox th{padding:3px 5px}
+#dpsTable tr[data-sel]{cursor:pointer}
+#dpsTable tr[data-sel]:hover td{background:#1a262b}
+.bosspick{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;margin-bottom:8px}
+.bosspick button{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;background:#121a1d;border:1px solid var(--line);border-radius:8px;color:inherit;cursor:pointer}
+.bosspick button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.bosspick button img{width:52px;height:52px;border-radius:6px}
+.bosspick button span{font-size:11px;line-height:1.2;text-align:center;word-break:break-all}
+.bosspick button i{position:absolute;top:3px;right:3px;font-style:normal;font-size:10px;background:#ff9a9a;color:#111;border-radius:3px;padding:0 3px}
+#dpsTable img,#bossBox table img{width:24px;height:24px;border-radius:4px;vertical-align:middle;margin-right:4px}
+.rules h3{font-size:14px;margin:14px 0 6px;color:var(--accent)}
+.rules li{margin:3px 0}
+.rules table{border-collapse:collapse;font-size:13px}
+.rules td,.rules th{border:1px solid var(--line);padding:3px 8px}
+#mnav{display:none}
+#hdrToggle{display:none}
+@media (hover:none){#tip{display:none!important}}
+@media (max-width:760px){
+  html,body{font-size:15px}
+  header{position:static;padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));gap:6px}
+  header h1{font-size:16px;margin:0;flex:1}
+  #hdrToggle{display:block;padding:4px 10px;background:#0f1417aa}
+  header:not(.open) > :not(h1):not(#hdrToggle){display:none!important}
+  header.open #hdrToggle{border-color:var(--accent)}
+  header .grow{display:none}
+  header #lineupName{flex:1 1 60%;min-width:0;width:auto!important}
+  header #savedSel{flex:1 1 50%;min-width:0}
+  header button{padding:5px 9px}
+  main{padding:10px 10px calc(76px + env(safe-area-inset-bottom))}
+  main{grid-template-columns:minmax(0,1fr)!important}
+  main > section{display:none;min-width:0}
+  body[data-view="pool"] #pool, body[data-view="board"] #boardSec, body[data-view="bonds"] #bondPanel{display:block}
+  #poolGrid{max-height:none;grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+  #bondList{max-height:none}
+  .slots{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .slot{min-height:96px}
+  .card .top{gap:5px}
+  .card img.av{width:40px;height:40px}
+  .card .ctrl{flex-wrap:wrap}
+  .card .ctrl button{padding:2px 6px;white-space:nowrap;font-size:12px}
+  .calc table,.rules table{display:block;overflow-x:auto;white-space:nowrap}
+  .calc .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tabs{position:sticky;top:0;z-index:5;background:var(--panel);padding:4px 0}
+  #mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:#111a1e;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  #mnav button{flex:1;border:0;border-radius:0;background:none;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:12px;color:var(--muted)}
+  #mnav button b{font-size:18px;line-height:1.1;font-weight:normal}
+  #mnav button.on{color:var(--accent)}
+  #mnav button i{font-style:normal;font-size:10px;color:var(--accent)}
+  #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+  #modal,#rules{padding:8px!important}
+  #modal .box,#rules .box{max-height:92vh!important}
+}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent2);border:1px solid var(--accent);padding:8px 14px;border-radius:8px;display:none;z-index:70}
+</style>
+</head>
+<body>
+<header>
+  <h1>卫戍协议·阵容模拟器</h1>
+  <button id="hdrToggle" type="button">阵容管理 ▾</button>
+  <input type="text" id="lineupName" placeholder="阵容名称" style="width:170px">
+  <button class="primary" id="btnSave">保存</button>
+  <select id="savedSel"><option value="">— 已保存的阵容 —</option></select>
+  <button id="btnLoad">载入</button>
+  <button id="btnDel">删除</button>
+  <button id="btnNew">新建/清空</button>
+  <span class="grow"></span>
+  <label title="人事部文档：最大可部署人数变为9"><input type="checkbox" id="deploy9"> 人事部文档（部署上限9）</label>
+  <button id="btnRules">规则说明</button>
+  <button id="btnExport">导出</button>
+  <button id="btnImport">导入</button>
+  <input type="file" id="fileIn" accept=".json" hidden>
+</header>
+
+<main>
+  <section class="panel" id="pool">
+    <h2>干员池 <small id="poolCount"></small></h2>
+    <div class="filters">
+      <input type="text" id="q" placeholder="搜索干员名…">
+      <div class="tierbar" id="tierbar"></div>
+      <select id="bondFilter"><option value="">全部盟约</option></select>
+      <div class="muted" style="font-size:12px">点击加入战场（满了进整备区），也可以拖到任意空位</div>
+    </div>
+    <div id="poolGrid"></div>
+  </section>
+
+  <section id="boardSec">
+    <div class="panel">
+      <div class="zone-h"><b>战场</b><span class="muted" id="fieldCount"></span></div>
+      <div class="slots" id="field"></div>
+      <div class="zone-h"><b>整备区</b><span class="muted">【远见】【奇迹】【投资人】干员在整备区也计入盟约</span></div>
+      <div class="slots" id="bench"></div>
+    </div>
+    <div class="panel" id="detail" style="margin-top:12px"><span class="muted">点选一名干员查看特质与装备</span></div>
+  </section>
+
+  <section class="panel" id="bondPanel">
+    <div class="tabs" id="tabs"><button data-tab="bonds" class="on">盟约激活</button><button data-tab="layers">层数设置</button><button data-tab="dps">属性 / DPS</button></div>
+    <div id="tab-bonds">
+      <h2>盟约激活 <small id="bondSummary"></small>
+        <label style="margin-left:auto;font-size:12px;font-weight:normal;display:flex;gap:4px;align-items:center"><input type="checkbox" id="showAll">显示全部</label></h2>
+      <div id="bondList"></div>
+    </div>
+    <div id="tab-layers" hidden>
+      <h2>盟约层数 <small>所有盟约集中设置，随阵容保存</small>
+        <button id="layerReset" style="margin-left:auto;font-size:12px">全部清零</button></h2>
+      <div class="muted" style="font-size:12px;margin-bottom:8px">层数会代入盟约效果公式，并用于“每叠加N层”类特质的属性计算。未激活的盟约也可以先填好层数。</div>
+      <div id="layerList"></div>
+    </div>
+    <div id="tab-dps" hidden class="calc">
+      <h2>属性 / DPS <small>场上干员</small></h2>
+      <div class="grid" id="calcSettings">
+        <label>统计时长 x（秒）<input type="number" min="1" step="1" data-cs="x"></label>
+        <label>敌人防御<input type="number" min="0" step="50" data-cs="def"></label>
+        <label>敌人法抗<input type="number" min="0" max="100" step="5" data-cs="res"></label>
+        <label>敌人数量（群攻）<input type="number" min="1" step="1" data-cs="targets"></label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" data-cs="trust">计入信赖加成</label>
+      </div>
+      <div class="muted" style="font-size:12px;margin:6px 0">平均 DPS = x 秒内（技能按初始技力 + 自然回复，不计其他技力变化）总伤害 ÷ x。点某行查看明细与条件开关。</div>
+      <div style="overflow:auto"><table id="dpsTable"></table></div>
+      <h2 style="margin-top:18px">领袖击杀模拟 <small>当前阵容需要多久打掉 Boss</small></h2>
+      <div id="bossBox"></div>
+    </div>
+  </section>
+</main>
+
+<div id="modal"><div class="box">
+  <div class="mh"><b id="mTitle">选择装备</b><input type="text" id="mQ" placeholder="搜索装备…" style="flex:1"><button id="mClear">清空此栏</button><button id="mClose">关闭</button></div>
+  <div class="mb" id="mBody"></div>
+</div></div>
+<div id="rules" class="modalx" style="position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:55;padding:16px"><div class="box" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(820px,100%);max-height:88vh;display:flex;flex-direction:column">
+  <div class="mh" style="display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--line)"><b>规则说明</b><span class="grow" style="flex:1"></span><button id="rulesClose">关闭</button></div>
+  <div class="mb rules" style="overflow:auto;padding:4px 16px 16px" id="rulesBody"></div>
+</div></div>
+<div id="tip"></div>
+<div id="toast"></div>
+<nav id="mnav">
+  <button data-view="pool"><b>☰</b>干员池</button>
+  <button data-view="board"><b>▦</b>阵容<i id="mnavCount"></i></button>
+  <button data-view="bonds"><b>◈</b>盟约 / 计算</button>
+</nav>
+
+<script src="data.js"></script>
+<script src="stats.js"></script>
+<script src="bosses.js"></script>
+<script src="calc.js"></script>
+<script>
+"use strict";
+const D = window.DATA;
+const TIERS = ["Ⅰ","Ⅱ","Ⅲ","Ⅳ","Ⅴ","Ⅵ"];
+const TC = {"Ⅰ":"var(--t1)","Ⅱ":"var(--t2)","Ⅲ":"var(--t3)","Ⅳ":"var(--t4)","Ⅴ":"var(--t5)","Ⅵ":"var(--t6)"};
+const OPS = {}; D.operators.forEach(o => OPS[o.name] = o);
+const BONDS = {}; D.bonds.forEach(b => BONDS[b.name] = b);
+const EQUIP = {}; D.equipment.forEach(e => EQUIP[e.name] = e);
+const CORE = D.bonds.filter(b => b.category === "核心盟约").map(b => b.name);
+const BENCH_COUNTS = new Set(["远见","奇迹","投资人"]);   // 整备区也可用于激活
+const ISO = "变形同构体";
+const BENCH_SIZE = 8;
+
+// 激活阈值：第一个值=激活人数，之后为强化档（来自效果文本中的 <在场N名…>）
+const THRESH = {};
+D.bonds.forEach(b => {
+  const t = [b.activate_count];
+  const m = [...b.effect.matchAll(/<在场(\d+)名/g)].map(x => +x[1]).filter(n => n > b.activate_count);
+  THRESH[b.name] = [...new Set(t.concat(m))].sort((a,b)=>a-b);
+});
+THRESH["绝技"] = [2,5];
+THRESH["独行"] = [1];
+
+const avatar = n => "avatars/" + encodeURIComponent(n) + ".png";
+const bossAvatar = n => "avatars/boss/" + encodeURIComponent(n) + ".png";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function isoBondOf(eqName){
+  if (!eqName) return null;
+  if (eqName.includes("维式重锤")) return "维多利亚";
+  return D.isomorph[eqName] || null;
+}
+// 暴躁铁皮：4 栏，精锐后 6 栏；其他干员 2 栏
+const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 4) : 2;
+
+/* ---------------- state ---------------- */
+const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
+const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600};
+function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}}; }
+let S = emptyLineup();
+let selected = null; // {zone, idx}
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } }
+};
+function normalize(L){
+  const n = emptyLineup();
+  n.name = L.name || ""; n.deploy9 = !!L.deploy9; n.layers = L.layers || {}; n.temp = +L.temp || 0;
+  n.calc = {...DEFAULT_CALC, ...(L.calc||{})};
+  n.boss = {...DEFAULT_BOSS, ...(L.boss||{})}; n.boss.opts = {...(n.boss.opts||{})};
+  const fix = u => {
+    if (!u || !OPS[u.name]) return null;
+    const r = {name:u.name, elite:!!u.elite, equips:(u.equips||[]).slice(0, slotCount(u.name, u.elite))};
+    ["skill","mod","conds","skp","manual"].forEach(k => { if (u[k] !== undefined) r[k] = u[k]; });
+    return r;
+  };
+  (L.field||[]).slice(0,9).forEach((u,i) => n.field[i] = fix(u));
+  (L.bench||[]).slice(0,BENCH_SIZE).forEach((u,i) => n.bench[i] = fix(u));
+  return n;
+}
+const fieldCap = () => S.deploy9 ? 9 : 8;
+// 有效层数：固定层数（+【乌萨斯】临时层数）
+const layersOf = name => (+S.layers[name] || 0) + (name === "乌萨斯" ? (+S.temp || 0) : 0);
+function autosave(){ store.set("wsxy-current", S); }
+
+/* ---------------- bond computation ---------------- */
+function unitBonds(u){
+  const base = OPS[u.name].bonds.slice();
+  const iso = [];
+  if (u.equips && u.equips.includes(ISO)){
+    u.equips.forEach(e => { const b = isoBondOf(e); if (b && !base.includes(b) && !iso.includes(b)) iso.push(b); });
+  }
+  return {base, iso};
+}
+function compute(){
+  const cap = fieldCap();
+  const field = S.field.slice(0,cap).map((u,i)=>u?{u,i,zone:"field"}:null).filter(Boolean);
+  const bench = S.bench.map((u,i)=>u?{u,i,zone:"bench"}:null).filter(Boolean);
+  const res = {};
+  D.bonds.forEach(b => res[b.name] = {name:b.name, members:new Map(), count:0, bonus:0, level:0});
+  const add = (b, x, isIso) => {
+    const r = res[b]; if (!r) return;
+    if (!r.members.has(x.u.name)) r.members.set(x.u.name, {name:x.u.name, iso:isIso, bench:x.zone==="bench"});
+    else if (!isIso) r.members.get(x.u.name).iso = false;
+    if (x.zone==="field") r.members.get(x.u.name).bench = false;
+  };
+  field.forEach(x => { const {base,iso} = unitBonds(x.u); base.forEach(b=>add(b,x,false)); iso.forEach(b=>add(b,x,true)); });
+  bench.forEach(x => { const {base,iso} = unitBonds(x.u); base.concat(iso).filter(b=>BENCH_COUNTS.has(b)).forEach(b=>add(b,x,iso.includes(b))); });
+  Object.values(res).forEach(r => r.count = r.members.size);
+  // 绝技：场上精锐干员数量（所有干员的精锐状态均可激活）
+  const elites = field.filter(x => x.u.elite);
+  res["绝技"].count = elites.length;
+  elites.forEach(x => res["绝技"].members.set(x.u.name + "#" + x.i, {name:x.u.name, iso:false, bench:false}));
+  // 独行：恰好 1 名
+  const solo = res["独行"];
+  // 调和：激活时核心盟约激活人数 +1（对场上已有成员的核心盟约生效）
+  const harmonyOn = res["调和"].count >= 1;
+  if (harmonyOn) CORE.forEach(c => { if (res[c].count >= 1) res[c].bonus = 1; });
+  Object.values(res).forEach(r => {
+    const t = THRESH[r.name], n = r.count + r.bonus;
+    r.total = n;
+    r.level = t.filter(x => n >= x).length;
+    if (r.name === "独行" && r.count !== 1) r.level = 0;
+  });
+  return {res, harmonyOn, fieldN: field.length};
+}
+
+/* ---------------- effect text ---------------- */
+function fmtNum(v){ return Math.round(v*100)/100; }
+function effectHTML(text, layers, total){
+  return text.split(" / ").map(line => {
+    let off = false;
+    const m1 = line.match(/<在场(\d+)名/); if (m1 && total < +m1[1]) off = true;
+    const m2 = line.match(/<(?:达到|首次到达)(\d+)层>/); if (m2 && layers < +m2[1]) off = true;
+    let h = esc(line).replace(/\(([-\d.]+)([+-])([\d.]+)×层数\)/g, (s,a,op,b) => {
+      const v = op==="+" ? +a + +b*layers : +a - +b*layers;
+      return `<b class="v" title="${esc(s)}">${fmtNum(v)}</b>`;
+    });
+    h = h.replace(/&lt;(.+?)&gt;/g, '<span class="muted">&lt;$1&gt;</span>');
+    return `<div class="${off?"off":""}">${h}</div>`;
+  }).join("");
+}
+
+/* ---------------- rendering ---------------- */
+const $ = id => document.getElementById(id);
+let tierOn = new Set();
+function renderPool(){
+  const q = $("q").value.trim(), bf = $("bondFilter").value;
+  const used = new Set([...S.field, ...S.bench].filter(Boolean).map(u=>u.name));
+  const list = D.operators.filter(o =>
+    (!q || o.name.includes(q)) && (!tierOn.size || tierOn.has(o.tier)) && (!bf || o.bonds.includes(bf)));
+  $("poolCount").textContent = `${list.length} / ${D.operators.length}`;
+  $("poolGrid").innerHTML = list.map(o => `
+    <div class="tile ${used.has(o.name)?"used":""}" draggable="true" data-op="${esc(o.name)}" style="--tc:${TC[o.tier]}">
+      <span class="tb">${o.tier}</span>
+      <img src="${avatar(o.name)}" alt="" loading="lazy">
+      <div class="nm">${esc(o.name)}</div>
+    </div>`).join("");
+}
+function markUsed(){
+  const used = new Set([...S.field, ...S.bench].filter(Boolean).map(u=>u.name));
+  document.querySelectorAll("#poolGrid .tile").forEach(t => t.classList.toggle("used", used.has(t.dataset.op)));
+}
+function cardHTML(u, zone, idx, bondState){
+  const o = OPS[u.name], {base, iso} = unitBonds(u);
+  const sel = selected && selected.zone===zone && selected.idx===idx;
+  const chip = (b, isIso) => {
+    const on = bondState[b] && bondState[b].level > 0;
+    return `<span class="chip ${CORE.includes(b)?"core":""} ${isIso?"iso":""} ${on?"on":""}" title="${isIso?"变形同构体赋予":""}">${esc(b)}</span>`;
+  };
+  const n = slotCount(u.name, u.elite);
+  let eqs = "";
+  for (let k=0;k<n;k++){
+    const e = u.equips[k];
+    const isoE = e && u.equips.includes(ISO) && (e===ISO || isoBondOf(e));
+    eqs += `<span class="eq ${e?"has":""} ${isoE?"iso":""}" data-eq="${k}" title="${esc(e ? (EQUIP[e]?.effect||e) : "点击选择装备")}">${esc(e || "+装备")}</span>`;
+  }
+  return `<div class="card ${sel?"sel":""}" draggable="true" style="--tc:${TC[o.tier]}">
+    <div class="top"><img class="av" src="${avatar(u.name)}" alt="">
+      <div style="min-width:0"><div class="nm">${esc(u.name)}</div><div class="meta">${o.tier} 阶 · ${esc(o.trait_type||"")}</div>
+      <div class="ctrl"><button data-act="elite" class="${u.elite?"elite-on":""}" title="切换精锐状态">★精锐</button><button data-act="swap" title="${zone==="field"?"移到整备区":"移到战场"}">${zone==="field"?"↓整备":"↑上场"}</button><button data-act="remove" title="移除">✕</button></div></div></div>
+    <div class="chips">${base.map(b=>chip(b,false)).join("")}${iso.map(b=>chip(b,true)).join("")}</div>
+    <div class="equips">${eqs}</div>
+  </div>`;
+}
+function renderBoard(state){
+  const cap = fieldCap();
+  const bs = state.res;
+  $("field").innerHTML = S.field.slice(0,cap).map((u,i) =>
+    `<div class="slot ${u?"":"empty"}" data-zone="field" data-idx="${i}">${u?cardHTML(u,"field",i,bs):""}</div>`).join("");
+  $("bench").innerHTML = S.bench.map((u,i) =>
+    `<div class="slot ${u?"":"empty"}" data-zone="bench" data-idx="${i}">${u?cardHTML(u,"bench",i,bs):""}</div>`).join("");
+  $("fieldCount").textContent = `${state.fieldN} / ${cap}`;
+  if ($("mnavCount")) $("mnavCount").textContent = `${state.fieldN}/${cap}`;
+}
+function renderBonds(state){
+  const showAll = $("showAll").checked;
+  const rows = Object.values(state.res).filter(r => showAll || r.count > 0)
+    .sort((a,b) => (b.level>0)-(a.level>0) || b.level-a.level || b.total-a.total || D.bonds.indexOf(BONDS[a.name])-D.bonds.indexOf(BONDS[b.name]));
+  const act = Object.values(state.res).filter(r=>r.level>0);
+  $("bondSummary").textContent = `已激活 ${act.length} 个（核心 ${act.filter(r=>CORE.includes(r.name)).length}）`;
+  $("bondList").innerHTML = rows.map(r => {
+    const b = BONDS[r.name], t = THRESH[r.name], max = t[t.length-1];
+    const cap = Math.max(max, r.total);
+    let pips = "";
+    for (let k=1;k<=cap;k++) pips += `<span class="pip ${k<=r.total?"f":""} ${t.includes(k)?"th":""}"></span>`;
+    const status = r.level===0 ? "未激活" : (r.level < t.length ? "已激活" : (t.length>1 ? "全部激活" : "已激活"));
+    const L = layersOf(r.name);
+    const mem = [...r.members.values()].map(m =>
+      `<img src="${avatar(m.name)}" class="${m.iso?"iso":""} ${m.bench?"bench":""}" style="--tc:${TC[OPS[m.name].tier]}" title="${esc(m.name)}${m.iso?"（变形同构体）":""}${m.bench?"（整备区）":""}">`).join("");
+    const notes = [];
+    if (r.bonus) notes.push("含【调和】+1");
+    if (r.name==="独行" && r.count>1) notes.push("在场2名及以上【独行】干员，效果失效");
+    if (r.name==="绝技") notes.push("按场上精锐干员数量计算");
+    const hasLayer = /层数|层>/.test(b.effect);
+    return `<div class="bond lv${Math.min(r.level,2)}">
+      <div class="bh"><b>${esc(r.name)}</b><span class="cat">${esc(b.category)} · ${t.join("/")}人</span>
+        <span class="status">${status}</span><span class="pips">${pips}</span><span class="cnt">${r.total}</span></div>
+      ${mem?`<div class="mem">${mem}</div>`:""}
+      ${notes.map(n=>`<div class="note">${esc(n)}</div>`).join("")}
+      <div class="eff">${effectHTML(b.effect, L, r.total)}</div>
+      ${hasLayer?`<div class="layer">层数 <input type="number" min="0" step="1" data-layer="${esc(r.name)}" value="${+S.layers[r.name]||0}"> <span>${r.name==="乌萨斯"&&S.temp?`+临时 ${S.temp} · `:""}也可在「层数设置」集中修改</span></div>`:""}
+    </div>`;
+  }).join("") || `<div class="muted">战场上还没有干员</div>`;
+}
+let lastState = null;
+const ctxFor = state => ({state, layersOf, OPS, EQUIP, D, unitBonds, calc:S.calc});
+const f0 = v => Math.round(v).toLocaleString("en-US");
+const f2 = v => (Math.round(v*100)/100).toString();
+const TYPE_CN = {phys:"物理", magic:"法术", true:"真实", heal:"治疗"};
+
+function renderDetail(){
+  const el = $("detail");
+  const u = selected && S[selected.zone][selected.idx];
+  if (!u){ el.innerHTML = '<span class="muted">点选一名干员查看特质、装备与属性计算</span>'; return; }
+  const o = OPS[u.name], {base, iso} = unitBonds(u);
+  const eqList = u.equips.filter(Boolean).map(e => `<div class="trait"><b>${esc(e)}</b>${isoBondOf(e)?` <span class="note" style="display:inline">同构→【${esc(isoBondOf(e))}】</span>`:""}<div class="muted">${esc(EQUIP[e]?.effect||"")}</div></div>`).join("");
+  el.innerHTML = `<div style="display:flex;gap:10px;align-items:center">
+      <img src="${avatar(u.name)}" style="width:64px;height:64px;border-radius:6px;border-bottom:3px solid ${TC[o.tier]}">
+      <div><b style="font-size:16px">${esc(u.name)}</b> <span class="muted">${o.tier} 阶 · ${esc(o.trait_type)}${o.prototype?" · 原型 "+esc(o.prototype):""}</span>
+      <div class="chips" style="margin-top:4px">${base.map(b=>`<span class="chip ${CORE.includes(b)?"core":""}">${esc(b)}</span>`).join("")}${iso.map(b=>`<span class="chip iso">${esc(b)}（同构）</span>`).join("")}</div></div></div>
+    <div class="row"><div class="trait ${u.elite?"":"active"}"><b>普通特质</b><div>${esc(o.trait)}</div></div>
+    ${o.trait_elite?`<div class="trait ${u.elite?"active":""}"><b>精锐特质</b><div>${esc(o.trait_elite)}</div></div>`:""}</div>
+    <div class="row"><b>装备</b>（${slotCount(u.name, u.elite)} 栏）${u.equips.includes(ISO)?"":' <span class="muted">— 携带“变形同构体”加一件对应装备即可获得额外盟约</span>'}${eqList||'<div class="muted">未携带装备</div>'}</div>
+    <div class="calc">${calcHTML(u)}</div>`;
+}
+
+function calcHTML(u){
+  const R = CALC.evaluate(u, selected, ctxFor(lastState || compute()));
+  if (R.error) return `<h3>属性计算</h3><div class="muted">${esc(R.error)}</div>`;
+  const s = CALC.src(u.name), o = OPS[u.name];
+  const onField = selected.zone === "field" && selected.idx < fieldCap();
+  const modSel = s.modules.length && R.cfg.mod && R.cfg.e >= 2
+    ? `<select data-u="mod">${s.modules.map((m,i)=>`<option value="${i}" ${R.mod&&R.mod.idx===i?"selected":""}>${esc(m.name)}（${esc(m.type)}）</option>`).join("")}</select> ${R.cfg.mod}级`
+    : (R.cfg.mod ? "无模组数据" : "无（未开放）");
+  const row = (label, k, fmt=f0) => `<tr><td>${label}</td><td>${fmt(R.base[k])}</td><td>${fmt(R.Fn[k])}</td><td>${R.SP?fmt(R.Fs[k]):"—"}</td></tr>`;
+  const SP = R.SP;
+  const skSel = R.unlocked.length ? `<select data-u="skill">${R.unlocked.map(x=>`<option value="${x.i}" ${x.i===R.skIdx?"selected":""}>技能${x.i+1}「${esc(x.sk.name)}」</option>`).join("")}</select>` : '<span class="muted">无可用技能</span>';
+  const num = (k, v, step=1) => `<input type="number" step="${step}" data-skp="${k}" value="${v}">`;
+  const chk = (k, v, label) => `<label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" data-skp="${k}" ${v?"checked":""}>${label}</label>`;
+  const skillBox = SP ? `
+    <div class="muted" style="font-size:12px;margin:4px 0">${esc(SP.sp||"—")} · ${esc(SP.trig||"")} · Rank ${SP.rank}：${esc(SP.desc)}</div>
+    <div class="grid">
+      <label>初始技力${num("init", SP.init)}</label>
+      <label>技力消耗${num("cost", SP.cost)}</label>
+      <label>持续（秒）${num("dur", SP.dur, 0.5)}</label>
+      <label>技力回复<select data-skp="sp">${["自动回复","攻击回复","受击回复","被动"].map(x=>`<option ${x===SP.sp?"selected":""}>${x}</option>`).join("")}</select></label>
+      <label>每次攻击倍率 %${num("hitScale", SP.hitScale, 5)}</label>
+      <label>每次攻击段数${num("hits", SP.hits)}</label>
+      <label>攻击目标数${num("targets", SP.targets)}</label>
+      <label>开启时爆发 %${num("burst", SP.burst, 10)}</label>
+      <label>技能伤害类型<select data-skp="type">${[["","默认"],["物理","物理"],["法术","法术"],["真实","真实"]].map(([v,t])=>`<option value="${v}" ${v===SP.type?"selected":""}>${t}</option>`).join("")}</select></label>
+      ${chk("charge", SP.charge, "蓄力型（下次攻击）")}
+      ${chk("noAttack", SP.noAttack, "技能期间不攻击")}
+      ${chk("heal", SP.heal, "技能改为治疗")}
+    </div>
+    <div style="margin-top:4px"><button data-act2="skpReset" style="font-size:12px">恢复自动解析值</button> <span class="muted" style="font-size:12px">参数由技能描述自动解析，可手动修正</span></div>` : "";
+  const effRows = rows => rows.map(r => {
+    const on = r.cond ? (u.conds||{})[r.key] === true : (u.conds||{})[r.key] !== false;
+    return `<div class="effrow ${r.cond?"cond":""} ${on?"":"off"}"><input type="checkbox" data-cond="${esc(r.key)}" data-def="${r.cond?0:1}" ${on?"checked":""}>
+      <div><span class="es">${esc(r.src)}</span>${r.cond?'<span class="tag-c">条件</span>':""} ${esc(r.text)}
+      <div class="ep">${r.items.map(it=>esc(it.desc)+(it.skillOnly?"（技能期间）":"")).join("；")}</div></div></div>`;
+  }).join("");
+  const mn = u.manual || {};
+  const man = (k, label) => `<label>${label}<input type="number" data-man="${k}" value="${+mn[k]||0}"></label>`;
+  const typeLbl = t => TYPE_CN[t] || t;
+  const healMode = R.typeN === "heal";
+  return `<h3>属性计算 <span class="muted" style="font-weight:normal;font-size:12px">${onField?"":"（不在战场上：盟约加成不计入）"}</span></h3>
+    <div style="font-size:12px" class="muted">数据源：<b style="color:var(--text)">${esc(s.page)}</b>${o.prototype?"（原型）":"（本体）"} · ${esc(s.cls||"")}-${esc(s.branch||"")} · ${esc(s.pos||"")}
+      · ${u.elite?"精锐":"初始"}：精英${R.B.e} Lv.${R.B.lv} · 技能 Rank ${R.cfg.sk} · 模组 ${modSel}</div>
+    ${R.notes.map(n=>`<div class="note">${esc(n)}</div>`).join("")}
+    <div class="big" style="margin:8px 0">
+      <div><span>${healMode?"普攻 HPS":"普攻 DPS"}（${typeLbl(R.typeN)}）</span><b>${f0(R.dpsN)}</b></div>
+      ${SP?`<div><span>技能期间（${typeLbl(R.typeS)}）</span><b>${SP.charge?f0(R.chargeHit+R.burstDmg)+"/次":f0(R.dpsS)}</b>${!SP.charge&&R.burstDmg?`<span>开启爆发 +${f0(R.burstDmg)}/次</span>`:""}</div>`:""}
+      <div><span>${R.X} 秒平均</span><b>${f0(R.avg)}</b><span>普攻 ${f0(R.avgN)} + 技能 ${f0(R.avgS)}</span></div>
+      <div><span>技能释放</span><b>${R.casts} 次</b><span>${R.timeline.length?"开启于 "+R.timeline.slice(0,6).join("s, ")+"s"+(R.timeline.length>6?"…":""):""}</span></div>
+    </div>
+    <table><tr><th></th><th>基础</th><th>常驻</th><th>技能期间</th></tr>
+      ${row("生命","hp")}${row("攻击","atk")}${row("防御","def")}${row("法抗","res",f2)}${row("攻击间隔(s)","interval",f2)}
+      <tr><td>攻速</td><td>100</td><td>${f0(R.Fn.aspd)}</td><td>${SP?f0(R.Fs.aspd):"—"}</td></tr>
+      <tr><td>伤害倍率</td><td>1</td><td>${f2(R.Mn.dmgMul)}</td><td>${SP?f2(R.Ms.dmgMul):"—"}</td></tr></table>
+    <h3>技能</h3>${skSel}${skillBox}
+    <h3>加成来源 <span class="muted" style="font-weight:normal;font-size:12px">黄色=条件类效果，勾选即假设条件已满足</span></h3>
+    ${effRows(R.eff.list) || '<div class="muted">没有识别到可计算的加成</div>'}
+    ${R.skillEff.length?effRows(R.skillEff):""}
+    <h3>手动额外加成 <span class="muted" style="font-weight:normal;font-size:12px">其他干员光环、未能自动识别的效果</span></h3>
+    <div class="grid">${man("atkP","攻击力 %")}${man("aspd","攻速")}${man("dmgP","伤害 %（乘算）")}${man("hpP","生命 %")}${man("defP","防御 %")}</div>`;
+}
+
+function renderLayers(state){
+  if ($("tab-layers").hidden) return;
+  $("layerList").innerHTML = D.bonds.map(b => {
+    const r = state.res[b.name], L = +S.layers[b.name] || 0, eff = layersOf(b.name);
+    const ms = [...b.effect.matchAll(/<(达到|首次到达|每叠加)(\d+)层>/g)].map(m => {
+      const ok = eff >= +m[2];
+      return `<span class="${ok?"ok":""}">${m[1]}${m[2]}层${m[1]==="每叠加"&&ok?` ×${Math.floor(eff / +m[2])}`:""}</span>`;
+    }).join("");
+    const usesLayer = /层数|层>/.test(b.effect);
+    return `<div class="lyr ${r.level>0?"act":""}">
+      <div class="ln">${esc(b.name)} <span class="muted" style="font-weight:normal;font-size:11px">${r.level>0?"已激活":"未激活"}${usesLayer?"":" · 效果不随层数变化"}</span></div>
+      <div class="lc"><button data-ly="${esc(b.name)}" data-d="-10">-10</button><button data-ly="${esc(b.name)}" data-d="-1">-1</button>
+        <input type="number" min="0" data-layer2="${esc(b.name)}" value="${L}">
+        <button data-ly="${esc(b.name)}" data-d="1">+1</button><button data-ly="${esc(b.name)}" data-d="10">+10</button></div>
+      ${b.name==="乌萨斯"?`<div class="ms" style="align-items:center;gap:6px;font-size:12px;color:var(--muted)">临时层数 <input type="number" min="0" id="tempLayer" value="${+S.temp||0}" style="width:64px;padding:1px 6px"> 合计 ${eff} 层</div>`:""}
+      ${ms?`<div class="ms">${ms}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+function skillCell(R, dps, burst, charge){
+  if (!R.SP || !R.SP.sp || /被动/.test(R.SP.sp)) return "<span class='muted'>—</span>";
+  if (R.SP.charge) return `${f0(charge + burst)}<span class="muted">/次</span>`;
+  return f0(dps) + (burst ? `<span class="muted"> +${f0(burst)}/次</span>` : "");
+}
+function renderDps(state){
+  if ($("tab-dps").hidden) return;
+  document.querySelectorAll("#calcSettings [data-cs]").forEach(i => { if (i.type==="checkbox") i.checked = !!S.calc[i.dataset.cs]; else if (document.activeElement !== i) i.value = S.calc[i.dataset.cs]; });
+  const cap = fieldCap(), ctx = ctxFor(state);
+  let sum = 0, sumN = 0, sumS = 0;
+  const rows = S.field.slice(0,cap).map((u,i) => {
+    if (!u) return "";
+    const R = CALC.evaluate(u, {zone:"field", idx:i}, ctx);
+    if (R.error) return `<tr data-sel="${i}"><td><img src="${avatar(u.name)}">${esc(u.name)}</td><td colspan="10" class="muted">${esc(R.error)}</td></tr>`;
+    const heal = R.typeN === "heal"; if (!heal){ sum += R.avg; sumN += R.avgN; sumS += R.avgS; }
+    return `<tr data-sel="${i}"><td><img src="${avatar(u.name)}">${esc(u.name)}${u.elite?' <span style="color:var(--t5)">★</span>':""}</td>
+      <td>${f0(R.Fn.hp)}</td><td>${f0(R.Fn.atk)}</td><td>${f0(R.Fn.def)}</td><td>${f2(R.Fn.interval)}</td>
+      <td>${f0(R.dpsN)}${heal?"<span class='muted'> 治疗</span>":""}</td><td>${skillCell(R, R.dpsS, R.burstDmg, R.chargeHit)}</td>
+      <td>${f0(R.avgN)}</td><td>${f0(R.avgS)}</td><td><b>${f0(R.avg)}</b></td><td>${R.casts}</td></tr>`;
+  }).join("");
+  $("dpsTable").innerHTML = `<tr><th>干员</th><th>生命</th><th>攻击</th><th>防御</th><th>间隔</th><th title="普攻状态下的 DPS">普攻DPS</th><th title="技能期间 DPS；+N/次 为开启瞬间的爆发伤害；蓄力型技能显示单次伤害">技能DPS</th><th title="x 秒内普攻造成的伤害 ÷ x">${S.calc.x}s普攻</th><th title="x 秒内技能造成的伤害 ÷ x">${S.calc.x}s技能</th><th>${S.calc.x}s均值</th><th>技能次数</th></tr>${rows || '<tr><td colspan="11" class="muted">战场上还没有干员</td></tr>'}
+    ${rows?`<tr><td><b>合计（不含治疗）</b></td><td colspan="6"></td><td><b>${f0(sumN)}</b></td><td><b>${f0(sumS)}</b></td><td><b>${f0(sum)}</b></td><td></td></tr>`:""}`;
+  renderBoss(state);
+}
+
+// ===== 领袖击杀模拟 =====
+const fmtT = t => t >= 60 ? `${Math.floor(t/60)}分${(t%60).toFixed(1)}秒` : `${t.toFixed(1)}秒`;
+function bossSim(state){
+  const bs = S.boss, B = BOSSES.list.find(b => b.name === bs.name); if (!B) return null;
+  const hpArr = B.hp[bs.mode] || [];
+  const hidden = !!(bs.hidden && hpArr.length > 1);
+  const HP = hidden ? hpArr[1] : hpArr[0];
+  const def0 = bs.def !== "" && bs.def != null ? +bs.def : (hidden ? B.hdef : B.def);
+  const res0 = bs.res !== "" && bs.res != null ? +bs.res : (hidden ? B.hres : B.res);
+  let mul0 = (+bs.extra || 0) / 100;
+  const opts = (B.opts||[]).concat(hidden ? (B.hiddenOpts||[]) : []);
+  opts.forEach(o => { const on = bs.opts[o.key] ?? o.def; mul0 *= on ? o.mul : (o.alt ?? 1); });
+  const phases = (B.phases||[]).slice().sort((a,b) => b.below - a.below);
+  // 阶段 k：已触发前 k 个生命阈值（生命只减不增，阈值效果视为持续）
+  const st = [{def:def0, res:res0, mul:mul0}];
+  phases.forEach((p,i) => { const q = st[i]; st.push({def:q.def*(p.defMul||1), res:Math.min(100, q.res+(p.resAdd||0)), mul:q.mul*(p.mul??1)}); });
+  const cap = Math.max(10, +bs.cap || 600);
+  const ctx = {...ctxFor(state), horizon:cap};
+  const units = [];
+  S.field.slice(0, fieldCap()).forEach((u,i) => {
+    if (!u) return;
+    const R = CALC.evaluate(u, {zone:"field", idx:i}, ctx);
+    if (R.error || R.heal) return;
+    units.push({u, R, rt: st.map(s => R.rates({def:s.def, res:s.res}, 1)), dmg:0, dn:0, ds:0});
+  });
+  let hp = HP, t = 0, k = 0, kill = null; const dt = 0.1, marks = [];
+  while (t < cap - 1e-9 && units.length){
+    let step = 0; const part = units.map(x => { const d = x.R.damageSplit(x.rt[k], t, t+dt); d.n *= st[k].mul; d.s *= st[k].mul; step += d.n + d.s; return d; });
+    const f = step >= hp ? hp / step : 1;
+    units.forEach((x,i) => { x.dn += part[i].n*f; x.ds += part[i].s*f; x.dmg = x.dn + x.ds; });
+    if (step >= hp){ kill = t + dt*f; hp = 0; break; }
+    hp -= step; t += dt;
+    while (k < phases.length && hp / HP < phases[k].below){ marks.push({t, label:phases[k].label}); k++; }
+  }
+  return {B, HP, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
+}
+function renderBoss(state){
+  const bs = S.boss, B = BOSSES.list.find(b => b.name === bs.name);
+  const pick = `<div class="bosspick">${BOSSES.list.map(b => `<button type="button" data-bpick="${esc(b.name)}" class="${b.name===bs.name?"on":""}" title="${esc(b.name)}${b.hidden?"（有隐秘核心）":""}"><img src="${bossAvatar(b.name)}" alt=""><span>${esc(b.name)}</span>${b.hidden?"<i>隐</i>":""}</button>`).join("")}</div>`;
+  const modeSel = `<select data-bs="mode">${BOSSES.modes.map(m => `<option${m===bs.mode?" selected":""}>${m}</option>`).join("")}</select>`;
+  const hasHidden = B && (B.hp[bs.mode]||[]).length > 1;
+  let html = pick + `<div class="grid" id="bossSettings">
+    <label>难度 / 规程等级${modeSel}</label>
+    <label style="flex-direction:row;align-items:center;gap:4px" title="${B && !B.hidden ? "该领袖没有隐秘核心形态" : "隐秘核心仅在险境及以上、规程等级5及以上出现"}"><input type="checkbox" data-bs="hidden" ${bs.hidden?"checked":""} ${hasHidden?"":"disabled"}>隐秘核心</label>
+    <label>防御（留空=资料值）<input type="number" min="0" step="50" data-bs="def" value="${esc(bs.def??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hdef:B.def) : ""}"></label>
+    <label>法抗（留空=资料值）<input type="number" min="0" max="100" step="5" data-bs="res" value="${esc(bs.res??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hres:B.res) : ""}"></label>
+    <label>额外受伤倍率 %<input type="number" min="0" step="5" data-bs="extra" value="${bs.extra}"></label>
+    <label>模拟上限（秒）<input type="number" min="10" step="60" data-bs="cap" value="${bs.cap}"></label>
+  </div>`;
+  if (!B){ $("bossBox").innerHTML = html + `<div class="muted" style="margin-top:6px">点上方头像选择领袖（标“隐”的有隐秘核心形态），再点一次取消。共 ${BOSSES.list.length} 个领袖，其中 ${BOSSES.list.filter(b=>b.hidden).length} 个有隐秘核心形态。</div>`; return; }
+  const R = bossSim(state);
+  if (R.opts.length) html += `<div style="margin:6px 0">${R.opts.map(o => `<label style="display:block;font-size:13px"><input type="checkbox" data-bopt="${o.key}" ${(bs.opts[o.key] ?? o.def)?"checked":""}> ${esc(o.label)}</label>`).join("")}</div>`;
+  const total = R.units.reduce((a,x) => a + x.dmg, 0);
+  const big = R.kill != null
+    ? `<div><b>${fmtT(R.kill)}</b><span>击杀时间</span></div>`
+    : `<div><b style="color:#e66">${R.units.length ? `>${R.cap}秒` : "—"}</b><span>${R.units.length ? `未击杀，剩余 ${f0(R.hpLeft)}（${(R.hpLeft/R.HP*100).toFixed(1)}%）` : "场上没有输出干员"}</span></div>`;
+  html += `<div class="big" style="margin:8px 0"><img src="${bossAvatar(B.name)}" alt="" style="width:62px;height:62px;border-radius:8px;border:2px solid ${R.hidden?"#ff9a9a":"var(--line)"}">${big}
+    <div><b>${f0(R.HP)}</b><span>生命值${R.hidden?"（隐秘核心）":""}</span></div>
+    <div><b>${f0(R.def0)} / ${f0(R.res0)}</b><span>防御 / 法抗</span></div>
+    <div><b>${R.kill ? f0(R.HP / R.kill) : f0(total / R.cap)}</b><span>平均有效 DPS</span></div></div>`;
+  if (R.phases.length) html += `<div class="muted" style="font-size:12px">阶段：${R.phases.map(p => {
+      const m = R.marks.find(x => x.label === p.label);
+      return `${esc(p.label)} → ${m ? `第 ${m.t.toFixed(1)} 秒触发` : "未触发"}`; }).join("；")}</div>`;
+  const tN = R.units.reduce((a,x) => a + x.dn, 0), tS = R.units.reduce((a,x) => a + x.ds, 0), m0 = R.st[0].mul;
+  const pc = v => total ? `<span class="muted"> ${(v/total*100).toFixed(0)}%</span>` : "";
+  html += `<table style="margin-top:6px"><tr><th>干员</th><th>普攻伤害</th><th>技能伤害</th><th>合计</th><th>占比</th><th title="对该领袖（初始阶段）的普攻 DPS">普攻DPS</th><th title="对该领袖（初始阶段）的技能期间 DPS">技能DPS</th></tr>${R.units.map(x =>
+      `<tr><td><img src="${avatar(x.u.name)}">${esc(x.u.name)}</td><td>${f0(x.dn)}</td><td>${f0(x.ds)}</td><td><b>${f0(x.dmg)}</b></td><td>${total ? (x.dmg/total*100).toFixed(1) : 0}%</td><td>${f0(x.rt[0].N * m0)}</td><td>${skillCell(x.R, x.rt[0].S * m0, x.rt[0].B * m0, x.rt[0].C * m0)}</td></tr>`).join("")}
+    <tr><td><b>合计</b></td><td><b>${f0(tN)}</b>${pc(tN)}</td><td><b>${f0(tS)}</b>${pc(tS)}</td><td><b>${f0(total)}</b></td><td colspan="3"></td></tr></table>`;
+  const notes = [B.note, R.hidden && B.hiddenNote].filter(Boolean);
+  html += `<details style="margin-top:6px"><summary>领袖能力（PRTS）</summary><ul style="font-size:12px">${B.abilities.map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>
+    ${notes.length ? `<div class="note" style="margin-top:6px">${notes.map(esc).join("<br>")}</div>` : ""}
+    <div class="muted" style="font-size:12px;margin-top:6px">单体目标、全程可攻击；技能按初始技力 + 自然回复循环。领袖减伤只作用于物理/法术伤害；召唤物、护盾、伤害传递、闪避（茧）、无敌/不死与转阶段时间未计入。生命值取自 PRTS「敌方资料」，防御/法抗取自敌人页面（各难度可能另有加成，可手动覆盖）。</div>`;
+  $("bossBox").innerHTML = html;
+}
+
+const RULES_HTML = `
+<h3>装备合成（模拟器暂不计算）</h3>
+<ul>
+  <li>PRTS 提示：<b>两件同名装备可以合成一件更强力的装备</b>（即【进阶】版本）。每件装备的效果分【基础】/【进阶】两档，标注【基础&amp;进阶】的两档相同。</li>
+  <li>其他获得进阶装备的方式：白铁特质（进入休整期时使自身携带的装备变为精锐版本）、机变阶段「整备」增益、博士投影（基础/进阶效果不同）。</li>
+  <li>以下装备同一干员同时持有时<b>组合</b>为 6 阶装备：</li>
+</ul>
+<table><tr><th>装备 A</th><th>装备 B</th><th>组合结果</th></tr>
+<tr><td>天马之盔</td><td>天马之枪</td><td>天马之耀</td></tr>
+<tr><td>不退者之盾</td><td>不退者力场</td><td>不退者卫护系统</td></tr>
+<tr><td>驱逐者警棍</td><td>驱逐者瓦斯</td><td>驱逐者防暴装备</td></tr>
+<tr><td>动能单手弩</td><td>动能加速器</td><td>动能轰击弩</td></tr>
+<tr><td>汲取者之喙</td><td>汲取者之心</td><td>汲取者之镰</td></tr></table>
+<ul>
+  <li>PRTS 未说明：进阶装备能否再合成、合成/组合后是否空出装备栏。</li>
+  <li><b>当前模拟器</b>：装备只按名字记录，不做合成与组合；属性计算统一使用【基础】效果。需要组合后的效果时，可直接在装备栏选择组合结果（如“天马之耀”）。</li>
+</ul>
+<h3>属性计算口径</h3>
+<table><tr><th>阶</th><th>初始</th><th>精锐</th><th>技能等级</th><th>模组</th></tr>
+<tr><td>Ⅰ</td><td>精一 55 级</td><td>精二 50 级</td><td rowspan="6">初始 Rank 4<br>精锐 Rank 7</td><td>初始无，精锐 1 级</td></tr>
+<tr><td>Ⅱ</td><td>精一 60 级</td><td>精二 55 级</td><td>初始无，精锐 1 级</td></tr>
+<tr><td>Ⅲ</td><td>精二 1 级</td><td>精二 60 级</td><td>初始无，精锐 1 级</td></tr>
+<tr><td>Ⅳ</td><td>精二 1 级</td><td>精二 60 级</td><td>初始无，精锐 1 级</td></tr>
+<tr><td>Ⅴ</td><td>精二 1 级</td><td>精二 60 级</td><td>初始无，精锐 1 级</td></tr>
+<tr><td>Ⅵ</td><td>精二 1 级</td><td>精二 60 级</td><td>初始无，精锐 3 级</td></tr></table>
+<ul>
+  <li>数据源：有「原型」的干员用原型页面（如 Pith(卫戍协议)）的属性/天赋/技能/模组，其余用干员本体页面。技能等级与初始无模组取自 PRTS「模拟配置」。</li>
+  <li>等级属性在该精英阶段 1 级与满级之间线性插值，超出满级按满级算。默认不计信赖加成，可在「属性 / DPS」中开启。</li>
+  <li>攻击力 = (基础 + 固定加成) × (1 + Σ百分比加成) × Π(攻击力提升至X%)；攻击间隔 = (基础间隔 + 修正) ÷ (攻速/100)，攻速限制 10~600。</li>
+  <li>物理伤害 = max(攻击 − 防御, 5%攻击)，法术伤害 = max(攻击 × (1 − 法抗%), 5%攻击)；“伤害提升至X%”同一来源取最大、不同来源相乘；弱点伤害取物理/法术中较高者。</li>
+  <li>DPS 只算直接伤害（含“额外附加X%攻击力伤害”类），不计元素损伤、持续伤害、召唤物、溅射/弹射。</li>
+  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。</li>
+  <li>条件类效果（开启技能时、部署后、叠加、对特定敌人……）默认不计入，在干员明细里勾选即“假设条件已满足”，可叠加的按叠满计算；常驻效果也可取消勾选。</li>
+  <li>盟约效果只对战场上的成员生效；【调和】干员享受已激活核心盟约效果；【精准】3 人时扩展到所有远程干员；【绝技】按精锐状态。位置相关的光环（周围/身前/两侧）用条件开关或手动加成补充。</li>
+</ul>
+<h3>领袖击杀模拟</h3>
+<ul>
+  <li>收录 PRTS「敌方资料」中的全部 10 个领袖；假想敌：胄/铳/管/械/茧/鳍 有隐秘核心形态（险境及以上、规程等级 5 及以上，生命值为红色数值）。</li>
+  <li>生命值按所选难度/规程等级取表；防御/法抗取自敌人页面级别数据，可手动覆盖。</li>
+  <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
+  <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
+</ul>`;
+
+function render(){
+  const state = compute();
+  lastState = state;
+  renderBoard(state); renderBonds(state); renderLayers(state); renderDps(state); markUsed(); renderDetail();
+  $("deploy9").checked = S.deploy9;
+  $("lineupName").value = S.name;
+  autosave();
+}
+
+/* ---------------- actions ---------------- */
+function placeNew(name, zone, idx){
+  const u = {name, elite:false, equips:[]};
+  if (zone){ S[zone][idx] = u; }
+  else {
+    let i = S.field.slice(0,fieldCap()).findIndex(x=>!x);
+    if (i >= 0) S.field[i] = u;
+    else { i = S.bench.findIndex(x=>!x); if (i<0) return toast("战场和整备区都满了"); S.bench[i] = u; zone="bench"; }
+  }
+  render();
+}
+function move(from, to){
+  const a = S[from.zone][from.idx], b = S[to.zone][to.idx];
+  S[to.zone][to.idx] = a; S[from.zone][from.idx] = b;
+  if (selected && selected.zone===from.zone && selected.idx===from.idx) selected = to;
+  render();
+}
+const isPhone = () => matchMedia("(max-width:760px)").matches;
+function setView(v){
+  document.body.dataset.view = v;
+  document.querySelectorAll("#mnav button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  try { localStorage.setItem("wsxy-view", v); } catch(_) {}
+  if (isPhone()) window.scrollTo(0, 0);
+}
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none",1800); }
+
+$("hdrToggle").addEventListener("click", () => { const h = document.querySelector("header"); h.classList.toggle("open"); $("hdrToggle").textContent = h.classList.contains("open") ? "收起 ▴" : "阵容管理 ▾"; });
+// 手机底部导航
+$("mnav").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
+{ let v = "pool"; try { v = localStorage.getItem("wsxy-view") || "pool"; } catch(_) {} setView(v); }
+// pool
+$("poolGrid").addEventListener("click", e => { const t = e.target.closest(".tile"); if (!t) return; placeNew(t.dataset.op); if (isPhone()) toast(`已加入：${t.dataset.op}`); });
+$("poolGrid").addEventListener("dragstart", e => { const t = e.target.closest(".tile"); if (t) e.dataTransfer.setData("text/plain", JSON.stringify({op:t.dataset.op})); });
+$("q").addEventListener("input", renderPool);
+$("bondFilter").addEventListener("change", renderPool);
+$("bondFilter").innerHTML += D.bonds.map(b=>`<option>${esc(b.name)}</option>`).join("");
+$("tierbar").innerHTML = TIERS.map(t=>`<button data-t="${t}" style="border-bottom:2px solid ${TC[t]}">${t}</button>`).join("");
+$("tierbar").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; const t=b.dataset.t; tierOn.has(t)?tierOn.delete(t):tierOn.add(t); b.classList.toggle("on"); renderPool(); });
+
+// board (field + bench)
+["field","bench"].forEach(z => {
+  const el = $(z);
+  el.addEventListener("click", e => {
+    const slot = e.target.closest(".slot"); if (!slot || !S[slot.dataset.zone][+slot.dataset.idx]) return;
+    const pos = {zone:slot.dataset.zone, idx:+slot.dataset.idx}, u = S[pos.zone][pos.idx];
+    const act = e.target.closest("[data-act]"), eq = e.target.closest("[data-eq]");
+    if (act && act.dataset.act==="swap"){
+      const tz = pos.zone === "field" ? "bench" : "field";
+      const lim = tz === "field" ? fieldCap() : S.bench.length;
+      const ti = S[tz].slice(0, lim).findIndex(x => !x);
+      if (ti < 0) return toast(tz === "field" ? "战场已满" : "整备区已满");
+      move(pos, {zone:tz, idx:ti}); return;
+    }
+    if (act && act.dataset.act==="remove"){ S[pos.zone][pos.idx]=null; if (selected&&selected.zone===pos.zone&&selected.idx===pos.idx) selected=null; render(); return; }
+    if (act && act.dataset.act==="elite"){
+      u.elite=!u.elite;
+      const n = slotCount(u.name, u.elite);
+      if (u.equips.length > n){ const cut = u.equips.splice(n); toast(`装备栏减少，已卸下：${cut.join("、")}`); }
+      render(); return;
+    }
+    selected = pos;
+    if (eq){ openEquip(pos, +eq.dataset.eq); }
+    render();
+  });
+  el.addEventListener("dragstart", e => { const slot = e.target.closest(".slot"); if (slot) e.dataTransfer.setData("text/plain", JSON.stringify({zone:slot.dataset.zone, idx:+slot.dataset.idx})); });
+  el.addEventListener("dragover", e => { const slot = e.target.closest(".slot"); if (slot){ e.preventDefault(); slot.classList.add("over"); } });
+  el.addEventListener("dragleave", e => { const slot = e.target.closest(".slot"); if (slot) slot.classList.remove("over"); });
+  el.addEventListener("drop", e => {
+    const slot = e.target.closest(".slot"); if (!slot) return; e.preventDefault();
+    let d; try { d = JSON.parse(e.dataTransfer.getData("text/plain")); } catch(_) { return; }
+    const to = {zone:slot.dataset.zone, idx:+slot.dataset.idx};
+    if (d.op) placeNew(d.op, to.zone, to.idx); else move(d, to);
+  });
+});
+
+// bond layers
+$("bondList").addEventListener("change", e => {
+  const i = e.target.closest("[data-layer]"); if (!i) return;
+  S.layers[i.dataset.layer] = Math.max(0, +i.value || 0); render();
+});
+$("showAll").addEventListener("change", render);
+// tabs
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("[data-tab]"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x===b));
+  ["bonds","layers","dps"].forEach(t => $("tab-"+t).hidden = t !== b.dataset.tab);
+  render();
+});
+// 层数面板
+$("layerList").addEventListener("click", e => {
+  const b = e.target.closest("[data-ly]"); if (!b) return;
+  const n = b.dataset.ly; S.layers[n] = Math.max(0, (+S.layers[n]||0) + +b.dataset.d); render();
+});
+$("layerList").addEventListener("change", e => {
+  if (e.target.id === "tempLayer"){ S.temp = Math.max(0, +e.target.value||0); render(); return; }
+  const i = e.target.closest("[data-layer2]"); if (!i) return;
+  S.layers[i.dataset.layer2] = Math.max(0, +i.value||0); render();
+});
+$("layerReset").addEventListener("click", () => { if (!confirm("所有盟约层数清零？")) return; S.layers = {}; S.temp = 0; render(); });
+// DPS 设置与表格
+$("calcSettings").addEventListener("change", e => {
+  const i = e.target.closest("[data-cs]"); if (!i) return;
+  S.calc[i.dataset.cs] = i.type==="checkbox" ? i.checked : Math.max(0, +i.value||0);
+  if (i.dataset.cs==="x" && !S.calc.x) S.calc.x = 1;
+  if (i.dataset.cs==="targets" && !S.calc.targets) S.calc.targets = 1;
+  render();
+});
+$("bossBox").addEventListener("click", e => {
+  const b = e.target.closest("[data-bpick]"); if (!b) return;
+  S.boss.name = S.boss.name === b.dataset.bpick ? "" : b.dataset.bpick; render();
+});
+$("bossBox").addEventListener("change", e => {
+  const t = e.target, bs = S.boss;
+  if (t.dataset.bopt){ bs.opts[t.dataset.bopt] = t.checked; render(); return; }
+  const k = t.dataset.bs; if (!k) return;
+  if (k === "hidden") bs.hidden = t.checked;
+  else if (k === "name" || k === "mode") bs[k] = t.value;
+  else if (k === "def" || k === "res") bs[k] = t.value === "" ? "" : Math.max(0, +t.value||0);
+  else bs[k] = Math.max(0, +t.value||0);
+  render();
+});
+$("dpsTable").addEventListener("click", e => {
+  const tr = e.target.closest("[data-sel]"); if (!tr) return;
+  selected = {zone:"field", idx:+tr.dataset.sel}; render();
+  if (isPhone()) setView("board");
+  $("detail").scrollIntoView({behavior:"smooth", block:"start"});
+});
+// 明细：技能 / 模组 / 条件开关 / 技能参数 / 手动加成
+$("detail").addEventListener("change", e => {
+  const u = selected && S[selected.zone][selected.idx]; if (!u) return;
+  const t = e.target;
+  if (t.dataset.u === "skill"){ u.skill = +t.value; delete u.skp; }
+  else if (t.dataset.u === "mod"){ u.mod = +t.value; }
+  else if (t.dataset.cond){ u.conds = u.conds || {}; const def = t.dataset.def === "1"; if (t.checked === def) delete u.conds[t.dataset.cond]; else u.conds[t.dataset.cond] = t.checked; }
+  else if (t.dataset.skp){ u.skp = u.skp || {}; u.skp[t.dataset.skp] = t.type==="checkbox" ? t.checked : (t.tagName==="SELECT" ? t.value : +t.value||0); }
+  else if (t.dataset.man){ u.manual = u.manual || {}; u.manual[t.dataset.man] = +t.value||0; }
+  else return;
+  render();
+});
+$("detail").addEventListener("click", e => {
+  const b = e.target.closest("[data-act2]"); if (!b) return;
+  const u = selected && S[selected.zone][selected.idx]; if (!u) return;
+  if (b.dataset.act2 === "skpReset"){ delete u.skp; render(); }
+});
+// 规则说明
+$("rulesBody").innerHTML = RULES_HTML;
+$("btnRules").addEventListener("click", () => $("rules").style.display = "flex");
+$("rulesClose").addEventListener("click", () => $("rules").style.display = "none");
+$("rules").addEventListener("click", e => { if (e.target.id === "rules") $("rules").style.display = "none"; });
+
+$("deploy9").addEventListener("change", e => {
+  S.deploy9 = e.target.checked;
+  if (!S.deploy9 && S.field[8]){ // 第9格的干员挪到整备区
+    const i = S.bench.findIndex(x=>!x); if (i>=0) S.bench[i]=S.field[8]; S.field[8]=null;
+  }
+  render();
+});
+$("lineupName").addEventListener("input", e => { S.name = e.target.value; autosave(); });
+
+// equipment modal
+let eqTarget = null;
+function openEquip(pos, k){
+  eqTarget = {pos, k}; $("mQ").value = "";
+  $("mTitle").textContent = `为 ${S[pos.zone][pos.idx].name} 选择装备（第 ${k+1} 栏）`;
+  renderEquip(); $("modal").classList.add("show"); $("mQ").focus();
+}
+function renderEquip(){
+  const q = $("mQ").value.trim();
+  let html = "", last = 0;
+  D.equipment.filter(e => !q || e.name.includes(q) || (e.effect||"").includes(q)).forEach(e => {
+    if (e.tier !== last){ html += `<div class="muted" style="margin:8px 0 4px">${e.tier} 阶</div>`; last = e.tier; }
+    const ib = isoBondOf(e.name);
+    html += `<div class="eqitem" data-name="${esc(e.name)}"><span class="en">${esc(e.name)}</span><span class="muted"> · 售价 ${e.price}</span>
+      ${e.name===ISO?'<span class="tag">搭配另一件对应装备获得额外盟约</span>':""}${ib?`<span class="tag">同构 → 【${esc(ib)}】</span>`:""}
+      <div class="ee">${esc(e.effect||"")}</div></div>`;
+  });
+  $("mBody").innerHTML = '<div class="note" style="margin-bottom:8px">装备合成（两件同名 → 进阶）与组合装备暂不计算，属性计算使用【基础】效果；详见“规则说明”。</div>' + (html || '<div class="muted">没有匹配的装备</div>');
+}
+function closeModal(){ $("modal").classList.remove("show"); eqTarget = null; }
+$("mQ").addEventListener("input", renderEquip);
+$("mClose").addEventListener("click", closeModal);
+$("modal").addEventListener("click", e => { if (e.target.id==="modal") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key==="Escape"){ closeModal(); $("rules").style.display = "none"; } });
+$("mClear").addEventListener("click", () => { const u=S[eqTarget.pos.zone][eqTarget.pos.idx]; u.equips[eqTarget.k]=undefined; u.equips=compactEq(u.equips); closeModal(); render(); });
+$("mBody").addEventListener("click", e => {
+  const it = e.target.closest(".eqitem"); if (!it || !eqTarget) return;
+  const u = S[eqTarget.pos.zone][eqTarget.pos.idx];
+  u.equips[eqTarget.k] = it.dataset.name; u.equips = compactEq(u.equips);
+  closeModal(); render();
+});
+function compactEq(a){ return a.filter(Boolean); }
+
+// tooltip on pool
+const tip = $("tip");
+$("poolGrid").addEventListener("mouseover", e => {
+  const t = e.target.closest(".tile"); if (!t){ tip.style.display="none"; return; }
+  const o = OPS[t.dataset.op];
+  tip.innerHTML = `<b>${esc(o.name)}</b> <span class="muted">${o.tier} 阶 · ${esc(o.trait_type)}</span><div class="chips" style="margin:4px 0">${o.bonds.map(b=>`<span class="chip ${CORE.includes(b)?"core":""}">${esc(b)}</span>`).join("")}</div><div>${esc(o.trait)}</div>${o.trait_elite?`<div class="muted" style="margin-top:4px">精锐：${esc(o.trait_elite)}</div>`:""}`;
+  tip.style.display = "block";
+});
+$("poolGrid").addEventListener("mousemove", e => {
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(e.clientX+14, innerWidth-w-8)+"px"; tip.style.top = Math.min(e.clientY+14, innerHeight-h-8)+"px";
+});
+$("poolGrid").addEventListener("mouseleave", () => tip.style.display="none");
+
+// saving
+function savedAll(){ return store.get("wsxy-lineups", {}); }
+function refreshSaved(sel){
+  const all = savedAll();
+  $("savedSel").innerHTML = '<option value="">— 已保存的阵容 —</option>' + Object.keys(all).sort().map(k=>`<option ${k===sel?"selected":""}>${esc(k)}</option>`).join("");
+}
+$("btnSave").addEventListener("click", () => {
+  const name = $("lineupName").value.trim(); if (!name) { toast("先给阵容起个名字"); $("lineupName").focus(); return; }
+  S.name = name; const all = savedAll();
+  all[name] = JSON.parse(JSON.stringify(S));
+  if (store.set("wsxy-lineups", all)) { refreshSaved(name); toast("已保存：" + name); } else toast("保存失败（浏览器禁止本地存储），请用“导出”");
+});
+$("btnLoad").addEventListener("click", () => {
+  const k = $("savedSel").value; if (!k) return; S = normalize(savedAll()[k]); selected=null; render(); toast("已载入：" + k);
+});
+$("savedSel").addEventListener("dblclick", () => $("btnLoad").click());
+$("btnDel").addEventListener("click", () => {
+  const k = $("savedSel").value; if (!k || !confirm(`删除阵容「${k}」？`)) return;
+  const all = savedAll(); delete all[k]; store.set("wsxy-lineups", all); refreshSaved(); toast("已删除");
+});
+$("btnNew").addEventListener("click", () => { if (!confirm("清空当前阵容？（已保存的不受影响）")) return; S = emptyLineup(); selected=null; render(); });
+$("btnExport").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({current:S, saved:savedAll()}, null, 2)], {type:"application/json"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "卫戍阵容_" + new Date().toISOString().slice(0,10) + ".json"; a.click(); URL.revokeObjectURL(a.href);
+});
+$("btnImport").addEventListener("click", () => $("fileIn").click());
+$("fileIn").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const saved = j.saved || (j.field ? {[j.name||"导入的阵容"]: j} : {});
+    const all = savedAll(); Object.entries(saved).forEach(([k,v]) => all[k] = normalize(v));
+    store.set("wsxy-lineups", all);
+    if (j.current) S = normalize(j.current);
+    refreshSaved(); render(); toast(`已导入 ${Object.keys(saved).length} 个阵容`);
+  } catch(err){ toast("导入失败：文件格式不对"); }
+  e.target.value = "";
+});
+
+/* ---------------- init ---------------- */
+S = normalize(store.get("wsxy-current", emptyLineup()));
+refreshSaved();
+renderPool();
+render();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  // 新版本接管后刷新一次（阵容已自动保存）
+  const hadCtrl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadCtrl && !window._swReloaded){ window._swReloaded = true; location.reload(); } });
+}
+</script>
+</body>
+</html>
