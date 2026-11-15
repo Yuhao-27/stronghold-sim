@@ -1,6 +1,7 @@
 import json, os, sys
 SP = os.path.dirname(os.path.abspath(__file__))
-SA = os.path.join(SP, "sa_src", "sa", "data")
+# 用法：python build_skid.py <本项目目录> <StrongholdAssistant 的 data 目录>
+SA = sys.argv[2] if len(sys.argv) > 2 else os.path.join(SP, "sa_src", "sa", "data")
 APP = sys.argv[1]
 def jsload(p, pre):
     s = open(p, encoding="utf8").read()
