@@ -76,6 +76,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .libc .lm{text-align:center;min-width:0}
 .libc .lm img{width:100%;aspect-ratio:1;border-radius:5px;border-bottom:3px solid var(--tc);display:block}
 .libc .lm div{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.libc .stl{font-size:11px;color:var(--accent);font-weight:bold;margin:8px 0 3px}.libc .stl:first-of-type{margin-top:0}
 .libc .sub{font-size:11px;color:var(--muted);margin-top:6px}
 #boardSec.compact #cbonds{display:block;margin:-4px 0 12px}
 #boardSec.compact #recoBox,#boardSec.compact #detail,#boardSec.compact .bhint{display:none}
@@ -87,6 +88,11 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .mini .nm{font-size:11px;width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ph{font-size:13px;font-weight:bold;margin:10px 0 5px}.ph small{font-weight:normal;color:var(--muted);margin-left:4px}
 .pgr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.pgr label{display:flex;flex-direction:column;gap:3px;font-size:13px;font-weight:bold;min-width:0}.pgr select{font-weight:normal;width:100%}
+.pb.goal b{font-weight:normal;margin-left:4px;color:var(--accent)}
+.pb.goal.on{background:rgba(8,216,165,.14);border-color:var(--accent);color:var(--text);text-decoration:none}
+.pgr label.ck{justify-content:flex-end}.pgr label.ck span{display:flex;align-items:center;gap:5px;font-weight:normal}.pgr label.ck small{font-weight:normal;font-size:11px}
+.libc .lm.lk img{outline:2px solid var(--accent);outline-offset:-2px}
+.libc .lm.fill{opacity:.55}.libc .lm.fill img{border:1px dashed var(--muted);border-bottom:3px dashed var(--tc)}
 .pbs{display:flex;flex-wrap:wrap;gap:5px}
 .pb{font-size:12px;padding:3px 9px}
 .pb.on{background:rgba(255,98,55,.18);border-color:var(--warn);color:#ffb39e;text-decoration:line-through}
@@ -330,6 +336,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   <section id="boardSec">
     <div class="panel">
       <div class="zone-h"><b>战场</b><span class="muted" id="fieldCount"></span><span style="flex:1"></span>
+        <div class="seg" id="stSeg" title="每个阵容有过渡、终局两套站位，盟约和计算按当前阶段"><button type="button" data-st="过渡">过渡</button><button type="button" data-st="终局">终局</button></div>
         <div class="seg" id="bvSeg" title="简洁版只显示头像和盟约，点头像进入完整版"><button type="button" data-bv="1">简洁</button><button type="button" data-bv="0">完整</button></div></div>
       <div class="slots" id="field"></div>
       <div id="cbonds"></div>
@@ -448,7 +455,8 @@ const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
 const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
 const DEFAULT_RECO = {tier:6, pick:"", all:false};
-function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}}; }
+function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}, stage:"终局", alt:{field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null)}}; }
+const STAGES = ["过渡","终局"], otherStage = st => st === "过渡" ? "终局" : "过渡";
 let S = emptyLineup();
 let selected = null; // {zone, idx}
 const store = {
@@ -471,6 +479,11 @@ function normalize(L){
   };
   (L.field||[]).slice(0,9).forEach((u,i) => n.field[i] = fix(u));
   (L.bench||[]).slice(0,BENCH_SIZE).forEach((u,i) => n.bench[i] = fix(u));
+  // 阶段：当前编辑的是 stage，另一阶段存在 alt
+  n.stage = L.stage === "过渡" ? "过渡" : "终局";
+  const A = L.alt || {};
+  (A.field||[]).slice(0,9).forEach((u,i) => n.alt.field[i] = fix(u));
+  (A.bench||[]).slice(0,BENCH_SIZE).forEach((u,i) => n.alt.bench[i] = fix(u));
   return n;
 }
 const fieldCap = () => S.deploy9 ? 9 : 8;
@@ -602,6 +615,8 @@ function renderBoard(state){
   const bs = state.res;
   $("boardSec").classList.toggle("compact", compactBoard);
   document.querySelectorAll("#bvSeg [data-bv]").forEach(b => b.classList.toggle("on", (b.dataset.bv === "1") === compactBoard));
+  const altN = S.alt.field.filter(Boolean).length;
+  document.querySelectorAll("#stSeg [data-st]").forEach(b => { b.classList.toggle("on", b.dataset.st === S.stage); b.textContent = b.dataset.st + (b.dataset.st !== S.stage && altN ? `·${altN}` : ""); });
   const body = (u, z, i) => !u ? "" : compactBoard ? miniHTML(u) : cardHTML(u, z, i, bs);
   $("field").innerHTML = S.field.slice(0,cap).map((u,i) =>
     `<div class="slot ${u?"":"empty"}" data-zone="field" data-idx="${i}">${body(u,"field",i)}</div>`).join("");
@@ -1026,8 +1041,9 @@ const RULES_HTML = `
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
   <li><b>简洁 / 完整</b>：战场右上角切换。简洁版只显示头像和盟约汇总（已激活的、差 1~2 人的），点头像回到完整版并打开该干员明细。<b>阵容库</b>（顶部按钮 / 手机底栏）用简洁版列出所有保存的阵容，可直接载入或删除。</li>
+  <li><b>过渡 / 终局</b>：战场右上角切换。每个阵容有两套站位，盟约、DPS、装备推荐都按当前阶段计算，保存和阵容库会同时保留两套。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
-  <li><b>对局规划</b>（盟约 / 计算 → 对局规划）：填本局禁用的核心盟约（≤5）、附加盟约（≤5）、首领和每波敌人特点。禁用规则：带任一被禁核心盟约的干员不出现；其他干员要全部盟约都被禁才不出现；被禁的盟约按无法激活处理。每个未被禁的核心盟约各给一套 8 人阵容，按盟约、波次需求（飞行要远程、隐匿要近战、元素/持续要医疗、致命/特异要重装……）、代入盟约后的全队 DPS 和首领击杀时间排序；不含装备和精锐。下方还会列出已保存的阵容本局能不能用。本局信息单独保存，换阵容不会清掉。</li>
+  <li><b>对局规划</b>（盟约 / 计算 → 对局规划）：填本局禁用的核心盟约（≤5）、附加盟约（≤5）、首领和每波敌人特点。禁用规则：带任一被禁核心盟约的干员不出现；其他干员要全部盟约都被禁才不出现；被禁的盟约按无法激活处理。每个未被禁的核心盟约各给一套过渡阵容（阶级和人数可调，默认 ≤Ⅲ 阶 6 人，尽量沿用终局里的人）和终局 8 人阵容，可一键载入两个阶段；按盟约、波次需求（飞行要远程、隐匿要近战、元素/持续要医疗、致命/特异要重装……）、代入盟约后的全队 DPS 和首领击杀时间排序；不含装备和精锐。「按目标盟约找阵容」：点盟约切换要求的档位（如叙拉古Ⅱ + 坚守Ⅰ），搜索刚好达成所有目标的最少干员组合，剩下的位置给出补位建议（虚线框）；勾选「保留当前战场干员」可在已有阵容上补齐。下方还会列出已保存的阵容本局能不能用。本局信息单独保存，换阵容不会清掉。</li>
   <li><b>推荐装备</b>（战场下方）：分「长期装备」和「一次性道具」两组。长期装备逐件试给每名场上非治疗干员（有空栏就加，满栏试替换一件，不动变形同构体及其对应装备），按该干员 x 秒平均 DPS 提升排序；卫戍推荐信/多功能补剂按“已激活盟约 +3 层”后全队 DPS 提升选人；已带组合装备一半的提示另一半；变形同构体只在某盟约差 1 人到下一档时推荐。一次性道具：随身身份牌按 +3 层全队收益；简易通讯机/寻呼模块/人事部记录选第一盟约离下一档最近的干员；博士投影选晋升精锐后全队 DPS 涨得最多的；信标选拿掉后掉盟约最少、输出最低的；资金/商店类与携带者无关。可用“商店等级”过滤。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
   <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
@@ -1270,7 +1286,7 @@ WAVE_TAGS.forEach(t => {
   const m = k => L.length ? L.reduce((a,x) => a + (+x[k]||0), 0) / L.length : 0;
   WAVE_AVG[t] = {hp:m("hp"), def:m("def"), res:m("res"), n:L.length};
 });
-const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟"};
+const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟", tTier:3, tN:6, goals:{}, gTier:6, gLock:false};
 let PLAN = {...DEFAULT_PLAN, ...store.get("wsxy-plan", {})};
 const savePlan = () => store.set("wsxy-plan", PLAN);
 
@@ -1324,9 +1340,10 @@ function opFeatures(){
   return F;
 }
 
-// ---- 打分（只看场上 8 人，近似：不计精锐/同构体/整备区） ----
+// ---- 打分（只看场上若干人，近似：不计精锐/同构体/整备区） ----
 const BI = {}; D.bonds.forEach((b,i) => BI[b.name] = i);
-function planSearch(){
+const tierOf = n => TIERS.indexOf(OPS[n].tier) + 1;
+function planModel(){
   const F = opFeatures(), B = planBoss();
   const avail = D.operators.filter(o => !opBanned(o.name)).map(o => o.name);
   const wc = {}; PLAN.waves.forEach(t => wc[t] = (wc[t]||0) + 1);
@@ -1335,10 +1352,10 @@ function planSearch(){
   const dmgMul = 1 + 0.2 * Math.min(1, (w("复苏") + w("特异")) / 2);
   const top = arr => { const s = arr.slice().sort((a,b) => b - a).slice(0, 8); return s.length ? s.reduce((a,x) => a + x, 0) / s.length : 1; };
   const refW = top(avail.map(n => F[n].dmg)) || 1, refB = B ? (top(avail.map(n => F[n].boss)) || 1) : 1;
-  // 单人价值
-  const V = {};
-  avail.forEach(n => {
-    const f = F[n]; let v;
+  // 单人价值（被锁定的干员即使被禁也要能估值）
+  const V = {}, OB = {};
+  D.operators.forEach(o => {
+    const n = o.name, f = F[n]; let v;
     if (f.heal) v = 1.6;
     else if (!f.known) v = 1.2;
     else {
@@ -1347,8 +1364,8 @@ function planSearch(){
       v = 2.6 * d * dmgMul;
     }
     V[n] = v + 0.12 * f.tier;
+    OB[n] = o.bonds.filter(b => !bondBanned(b)).map(b => BI[b]);
   });
-  const OB = {}; avail.forEach(n => OB[n] = OPS[n].bonds.filter(b => !bondBanned(b)).map(b => BI[b]));
   const cnt = new Int8Array(D.bonds.length);
   const iHarm = BI["调和"], iSolo = BI["独行"], iSkill = BI["绝技"];
   const coreIdx = new Set(CORE.map(c => BI[c]));
@@ -1368,7 +1385,7 @@ function planSearch(){
   function score(team, ci){
     const L = levels(team); let s = 0;
     for (let i = 0; i < L.length; i++) if (L[i]) s += coreIdx.has(i) ? 6 + 5 * (L[i] - 1) : 3 + 2 * (L[i] - 1);
-    if (!L[ci]) s -= 100;
+    if (ci >= 0 && !L[ci]) s -= 100;
     let ranged = 0, melee = 0, heal = 0, tank = 0, fast = 0;
     team.forEach(n => { const f = F[n]; s += V[n];
       if (f.ranged && !f.heal && f.dmg > 0) ranged++; if (f.melee) melee++; if (f.heal) heal++; if (f.tank) tank++;
@@ -1381,41 +1398,104 @@ function planSearch(){
     s += w("频次") * 0.6 * Math.min(4, fast);
     return s;
   }
-  const N = 8, out = [];
-  CORE.filter(c => !PLAN.banCore.includes(c)).forEach(c => {
-    const ci = BI[c];
-    const own = avail.filter(n => OPS[n].bonds.includes(c));
-    if (own.length < THRESH[c][0]) { out.push({core:c, team:null, own}); return; }
-    let team = own.slice().sort((a,b) => V[b] - V[a]).slice(0, THRESH[c][0]);
+  // 以核心盟约 ci 为主（ci<0 不强制），从 pool 里挑 N 人；fixed 里的人不动；extra 额外加分
+  function bestTeam(ci, pool, N, {fixed = [], extra = null, swap = true} = {}){
+    const sc = t => score(t, ci) + (extra ? extra(t) : 0);
+    let team = fixed.slice(0, N);
+    if (ci >= 0){
+      const c = D.bonds[ci].name;
+      pool.filter(n => OPS[n].bonds.includes(c) && !team.includes(n)).sort((a,b) => V[b] - V[a])
+        .slice(0, Math.max(0, THRESH[c][0] - team.filter(n => OPS[n].bonds.includes(c)).length)).forEach(n => team.length < N && team.push(n));
+    }
     while (team.length < N){
       let best = null, bs = -Infinity;
-      avail.forEach(n => { if (team.includes(n)) return; const s = score(team.concat(n), ci); if (s > bs){ bs = s; best = n; } });
+      for (const n of pool){ if (team.includes(n)) continue; const s = sc(team.concat(n)); if (s > bs){ bs = s; best = n; } }
       if (!best) break; team.push(best);
     }
-    let cur = score(team, ci);
-    for (let it = 0; it < 40; it++){
+    let cur = sc(team);
+    for (let it = 0; swap && it < 40; it++){
       let bt = null, bs = cur;
-      for (let k = 0; k < team.length; k++) for (const n of avail){
+      for (let k = fixed.length; k < team.length; k++) for (const n of pool){
         if (team.includes(n)) continue;
-        const t2 = team.slice(); t2[k] = n; const s = score(t2, ci);
+        const t2 = team.slice(); t2[k] = n; const s = sc(t2);
         if (s > bs + 1e-6){ bs = s; bt = t2; }
       }
       if (!bt) break; team = bt; cur = bs;
     }
-    out.push({core:c, team, own, score:cur, F});
+    return {team, score:cur};
+  }
+  return {F, B, avail, V, levels, score, bestTeam, coreIdx};
+}
+
+// 每个未被禁的核心盟约：终局 8 人 + 过渡（阶级、人数受限，尽量沿用终局里的人）
+function planSearch(M){
+  const {avail, bestTeam} = M, out = [];
+  const tTier = +PLAN.tTier || 3, tN = Math.max(3, Math.min(9, +PLAN.tN || 6));
+  const cheap = avail.filter(n => tierOf(n) <= tTier);
+  CORE.filter(c => !PLAN.banCore.includes(c)).forEach(c => {
+    const ci = BI[c], own = avail.filter(n => OPS[n].bonds.includes(c));
+    if (own.length < THRESH[c][0]) { out.push({core:c, team:null, own}); return; }
+    const fin = bestTeam(ci, avail, 8);
+    const ownCheap = cheap.filter(n => OPS[n].bonds.includes(c));
+    const keep = new Set(fin.team);
+    const tr = ownCheap.length >= THRESH[c][0] ? bestTeam(ci, cheap, tN, {extra: t => 1.5 * t.filter(n => keep.has(n)).length}) : null;
+    out.push({core:c, team:fin.team, score:fin.score, own, trans:tr && tr.team});
   });
-  return {avail, list:out, F};
+  return out;
+}
+
+// 目标盟约：找出刚好达成所有目标的最少干员组合（深度优先 + 剪枝）
+function goalSearch(M){
+  const goals = Object.entries(PLAN.goals || {}).filter(([b, l]) => l > 0 && BONDS[b] && !bondBanned(b)).map(([b, l]) => ({b, i:BI[b], need:THRESH[b][Math.min(l, THRESH[b].length) - 1], l:Math.min(l, THRESH[b].length)}));
+  if (!goals.length) return null;
+  const {avail, V, levels, bestTeam} = M, cap = fieldCap();
+  const gTier = +PLAN.gTier || 6;
+  const locked = PLAN.gLock ? S.field.slice(0, cap).filter(u => u && !isWild(u)).map(u => u.name) : [];
+  const pool = avail.filter(n => tierOf(n) <= gTier && !locked.includes(n));
+  const harmOps = bondBanned("调和") ? [] : pool.filter(n => OPS[n].bonds.includes("调和"));
+  const met = t => { const L = levels(t); return goals.every(g => L[g.i] >= g.l); };
+  // 下界：剩余缺口最大的盟约还差几人（调和可替所有核心 +1，按 1 人算）
+  const deficit = t => { const c = {}; t.forEach(n => OPS[n].bonds.forEach(b => c[b] = (c[b]||0) + 1));
+    const harm = !bondBanned("调和") && (c["调和"]||0) >= 1;
+    return goals.map(g => ({g, d: g.need - (c[g.b]||0) - (harm && CORE.includes(g.b) ? 1 : 0)})); };
+  const sols = new Map(); let nodes = 0, best = Infinity;
+  const NODE_MAX = 40000;
+  (function dfs(team){
+    if (++nodes > NODE_MAX) return;
+    const ds = deficit(team), open = ds.filter(x => x.d > 0);
+    if (!open.length && met(team)){
+      const k = team.slice().sort().join("|");
+      if (!sols.has(k)){ sols.set(k, team.slice()); best = Math.min(best, team.length); }
+      return;
+    }
+    const lb = Math.max(1, ...open.map(x => x.d));
+    if (team.length + lb > Math.min(cap, best + 1)) return;
+    // 选候选最少的未达成盟约来分支
+    let pick = null, cands = null;
+    open.forEach(x => { const cs = pool.filter(n => !team.includes(n) && OPS[n].bonds.includes(x.g.b));
+      if (CORE.includes(x.g.b) && !team.some(n => OPS[n].bonds.includes("调和"))) harmOps.forEach(n => !team.includes(n) && !cs.includes(n) && cs.push(n));
+      if (!cands || cs.length < cands.length){ pick = x; cands = cs; } });
+    if (!cands || !cands.length) return;
+    const cover = n => open.filter(x => OPS[n].bonds.includes(x.g.b)).length;
+    cands.sort((a,b) => cover(b) - cover(a) || V[b] - V[a]);
+    for (const n of cands.slice(0, 10)){ team.push(n); dfs(team); team.pop(); if (nodes > NODE_MAX) return; }
+  })(locked.slice());
+  const list = [...sols.values()].map(t => ({team:t, size:t.length, val:t.reduce((a,n) => a + V[n], 0)}))
+    .sort((a,b) => a.size - b.size || b.val - a.val).slice(0, 6);
+  // 剩下的位置：按综合打分补位建议（不改动方案里的人）
+  list.forEach(x => { const f = bestTeam(-1, pool, cap, {fixed:x.team, swap:false}); x.fill = f.team.slice(x.team.length); });
+  return {goals, list, locked, nodes, truncated: nodes > NODE_MAX};
 }
 
 // 用真实盟约效果算一遍：全队 DPS（对波次平均敌人）+ 首领击杀时间
-function planEval(team){
+function planEval(team, withBoss = true){
   const en = waveEnemy(), B = planBoss();
   const calc0 = S.calc, boss0 = S.boss, d9 = S.deploy9;
   try {
-    S.calc = {...S.calc, def:en.def, res:en.res}; S.deploy9 = false;
+    S.calc = {...S.calc, def:en.def, res:en.res}; S.deploy9 = team.length > 8;
     return withTemp(() => { S.field = Array(9).fill(null); team.forEach((n,i) => S.field[i] = {name:n, elite:false, equips:[]}); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
       const r = {dps:teamAvg(st), res:st.res, kill:null};
-      if (B){ S.boss = {...DEFAULT_BOSS, opts:{}, name:B.name, mode:PLAN.mode}; const R = bossSim(st, 1, 600); r.kill = R ? R.kill : null; r.bossHP = R && R.HP; }
+      if (B && withBoss){ S.boss = {...DEFAULT_BOSS, opts:{}, name:B.name, mode:PLAN.mode}; const R = bossSim(st, 1, 600); r.kill = R ? R.kill : null; }
       return r;
     });
   } finally { S.calc = calc0; S.boss = boss0; S.deploy9 = d9; }
@@ -1437,7 +1517,7 @@ function waveChecks(team, F){
 }
 
 let planCache = {key:"", html:""}, planTimer = null;
-const planKey = () => JSON.stringify([PLAN, S.calc.x, S.calc.trust, S.calc.def, S.calc.res, Object.keys(savedAll())]);
+const planKey = () => JSON.stringify([PLAN, S.calc.x, S.calc.trust, S.calc.def, S.calc.res, Object.keys(savedAll()), PLAN.gLock ? [S.field.slice(0, fieldCap()).map(u => u && u.name), S.deploy9] : 0]);
 function renderPlan(){
   if ($("tab-plan").hidden) return;
   if (planKey() === planCache.key) return;
@@ -1450,6 +1530,9 @@ function renderPlanInputs(){
   const chip = (b, kind) => { const on = PLAN[kind].includes(b); return `<button type="button" class="pb ${on?"on":""}" data-pban="${kind}:${esc(b)}">${esc(b)}</button>`; };
   const bossOpts = `<option value="">（不选）</option>` + BOSSES.list.map(b => `<option${b.name===PLAN.boss?" selected":""}>${esc(b.name)}</option>`).join("");
   const modeOpts = BOSSES.modes.map(m => `<option${m===PLAN.mode?" selected":""}>${m}</option>`).join("");
+  const tierOpts = v => [1,2,3,4,5,6].map(t => `<option value="${t}"${t===+v?" selected":""}>≤ ${TIERS[t-1]}</option>`).join("");
+  const goalChip = b => { const l = (PLAN.goals||{})[b] || 0, T = THRESH[b], lv = Math.min(l, T.length);
+    return `<button type="button" class="pb goal ${l?"on":""}" data-pgoal="${esc(b)}" title="点击切换：不要求 → ${T.map((n,i) => `${TIERS[i]}（${n} 人）`).join(" → ")}">${esc(b)}${l ? `<b>${TIERS[lv-1]}·${T[lv-1]}人</b>` : ""}</button>`; };
   $("planIn").innerHTML = `
     <div class="ph">禁用核心盟约 <small>${PLAN.banCore.length}/5</small></div><div class="pbs">${CORE.map(b => chip(b, "banCore")).join("")}</div>
     <div class="ph">禁用附加盟约 <small>${PLAN.banSub.length}/5</small></div><div class="pbs">${SUBS.map(b => chip(b, "banSub")).join("")}</div>
@@ -1457,30 +1540,59 @@ function renderPlanInputs(){
     <div class="ph">每波敌人特点 <small>按顺序点选，可重复</small></div>
     <div class="pbs">${WAVE_TAGS.map(t => `<button type="button" class="pb" data-pwave="${t}" title="${esc(WAVE_INFO[t]?.d||"")}">+ ${t}</button>`).join("")}</div>
     <div class="pws">${PLAN.waves.length ? PLAN.waves.map((t,i) => `<span>第${i+1}波 <b>${t}</b><button type="button" data-pwdel="${i}" title="移除">×</button></span>`).join("") : `<span class="muted" style="border:0;background:none">还没有添加波次</span>`}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button type="button" data-preset="1">清空本局信息</button></div>`;
+    <div class="pgr"><label>过渡阵容阶级<select data-pk="tTier">${tierOpts(PLAN.tTier)}</select></label><label>过渡阵容人数<select data-pk="tN">${[3,4,5,6,7,8].map(n => `<option${n===+PLAN.tN?" selected":""}>${n}</option>`).join("")}</select></label></div>
+    <div style="margin-top:8px;display:flex;gap:6px"><button type="button" data-preset="1">清空本局信息</button></div>
+    <div class="ph" style="margin-top:16px">按目标盟约找阵容 <small>点盟约切换要求的档位，找出最少需要哪些人</small></div>
+    <div class="pbs">${CORE.concat(SUBS).filter(b => b !== "绝技" && !bondBanned(b)).map(goalChip).join("")}</div>
+    <div class="pgr"><label>干员阶级<select data-pk="gTier">${tierOpts(PLAN.gTier)}</select></label>
+      <label class="ck"><span><input type="checkbox" data-pk="gLock" ${PLAN.gLock?"checked":""}> 保留当前战场干员</span><small class="muted">在已有阵容上补齐目标</small></label></div>
+    ${Object.values(PLAN.goals||{}).some(Boolean) ? `<div style="margin-top:6px"><button type="button" data-pgclear="1">清空目标</button></div>` : ""}`;
 }
+const teamRow = (team, mark = new Set(), dim = []) => `<div class="lf">${team.map(n => `<div class="lm ${mark.has(n)?"lk":""}" style="--tc:${TC[OPS[n].tier]}" title="${esc(n)}${mark.has(n)?"（已在场）":""}"><img src="${avatar(n)}" alt=""><div>${esc(n)}</div></div>`).join("")}${dim.map(n => `<div class="lm fill" style="--tc:${TC[OPS[n].tier]}" title="补位建议：${esc(n)}"><img src="${avatar(n)}" alt=""><div>${esc(n)}</div></div>`).join("")}</div>`;
+const bondsRow = res => { const act = Object.values(res).filter(r => r.level > 0 && !bondBanned(r.name)).sort((a,b) => (CORE.includes(b.name) - CORE.includes(a.name)) || b.level - a.level);
+  return `<div class="cb">${act.map(r => `<span class="on ${CORE.includes(r.name)?"core":""}">${esc(r.name)}<b>${r.total}${r.level >= THRESH[r.name].length ? "·满" : `→${THRESH[r.name][r.level]}`}</b></span>`).join("") || '<span class="lbl">没有激活的盟约</span>'}</div>`; };
+let planRows = [], goalRows = [];
 function buildPlan(){
-  const key = planKey(), {avail, list, F} = planSearch();
+  const key = planKey(), M = planModel(), {avail, F, B} = M;
+  const list = planSearch(M);
   const nBan = D.operators.length - avail.length;
-  let html = `<div class="muted" style="font-size:12px;margin:4px 0 8px">本局可用干员 <b style="color:var(--text)">${avail.length}</b> / ${D.operators.length}（被禁 ${nBan}）。被禁的盟约按无法激活处理。推荐只看场上 8 人的盟约和单人输出，不含装备和精锐；DPS 已代入盟约效果。</div>`;
-  // 推荐阵容
-  const B = planBoss();
-  const rows = list.filter(x => x.team).map(x => ({...x, ev:planEval(x.team)}));
-  // 排序：盟约/波次打分 + 代入盟约后的真实 DPS + 首领击杀速度
+  let html = `<div class="muted" style="font-size:12px;margin:4px 0 8px">本局可用干员 <b style="color:var(--text)">${avail.length}</b> / ${D.operators.length}（被禁 ${nBan}）。被禁的盟约按无法激活处理。推荐只看场上的盟约和单人输出，不含装备和精锐；DPS 已代入盟约效果。</div>`;
+  // ---- 目标盟约 ----
+  const G = goalSearch(M);
+  goalRows = [];
+  if (G){
+    html += `<h3 class="psh">目标盟约方案 <small>${G.goals.map(g => `${g.b}${TIERS[g.l-1]}`).join(" + ")}${G.locked.length ? ` · 保留场上 ${G.locked.length} 人` : ""}</small></h3>`;
+    if (!G.list.length) html += `<div class="muted">在 ${fieldCap()} 人以内凑不出这些目标${G.truncated ? "（搜索量太大，已提前停止）" : ""}。试着降低档位、放宽阶级，或少选几个目标。</div>`;
+    const lockSet = new Set(G.locked);
+    G.list.forEach((x, i) => {
+      const ev = planEval(x.team, false);
+      goalRows.push(x);
+      const add = x.team.filter(n => !lockSet.has(n));
+      html += `<div class="libc pc">
+        <div class="lh"><b>方案 ${i+1}</b><span class="muted" style="font-size:12px">${G.locked.length ? `再买 ${add.length} 人` : `${x.size} 人`} · 空 ${fieldCap() - x.size} 个位置 · DPS ${f0(ev.dps)}</span><span style="flex:1"></span><button class="primary" data-pgload="${i}">放上战场</button></div>
+        ${teamRow(x.team, lockSet, x.fill)}
+        ${bondsRow(ev.res)}
+        ${x.fill.length ? `<div class="sub">虚线框是补位建议（不在方案里，按综合打分挑的）</div>` : ""}
+      </div>`;
+    });
+  }
+  // ---- 每个核心盟约：过渡 + 终局 ----
+  const rows = list.filter(x => x.team).map(x => ({...x, ev:planEval(x.team), tev:x.trans ? planEval(x.trans, false) : null}));
   const maxD = Math.max(1, ...rows.map(x => x.ev.dps)), kills = rows.map(x => x.ev.kill).filter(k => k != null), bestK = kills.length ? Math.min(...kills) : 0;
   rows.forEach(x => x.rank = x.score + 6 * x.ev.dps / maxD + (B && x.ev.kill != null ? 6 * bestK / x.ev.kill : 0));
   rows.sort((a,b) => b.rank - a.rank);
-  html += `<h3 class="psh">推荐阵容 <small>按核心盟约各给一套，综合盟约、波次需求、全队输出${B ? "和首领击杀时间" : ""}排序</small></h3>`;
+  html += `<h3 class="psh">推荐阵容 <small>每个核心盟约一套：过渡（≤ ${TIERS[(+PLAN.tTier||3)-1]} 阶 · ${PLAN.tN} 人）→ 终局（8 人）；按盟约、波次需求、全队输出${B ? "和首领击杀时间" : ""}排序</small></h3>`;
   html += rows.map((x, i) => {
-    const act = Object.values(x.ev.res).filter(r => r.level > 0 && !bondBanned(r.name)).sort((a,b) => (CORE.includes(b.name) - CORE.includes(a.name)) || b.level - a.level);
-    const bonds = act.map(r => `<span class="on ${CORE.includes(r.name)?"core":""}">${esc(r.name)}<b>${r.total}${r.level >= THRESH[r.name].length ? "·满" : `→${THRESH[r.name][r.level]}`}</b></span>`).join("");
-    const ms = x.team.map(n => `<div class="lm" style="--tc:${TC[OPS[n].tier]}" title="${esc(n)}"><img src="${avatar(n)}" alt=""><div>${esc(n)}</div></div>`).join("");
     const kill = B ? (x.ev.kill != null ? `首领 ${fmtT(x.ev.kill)} 击杀` : `首领 10 分钟内打不死`) : "";
     const spare = x.own.filter(n => !x.team.includes(n));
+    const fin = new Set(x.team);
     return `<div class="libc pc">
-      <div class="lh">${i===0?'<span class="best">首选</span>':""}<b>${esc(x.core)}</b><span class="muted" style="font-size:12px">全队 DPS ${f0(x.ev.dps)}${kill ? " · " + kill : ""}</span><span style="flex:1"></span><button class="primary" data-pload="${i}">载入为阵容</button></div>
-      <div class="lf">${ms}</div>
-      <div class="cb">${bonds}</div>
+      <div class="lh">${i===0?'<span class="best">首选</span>':""}<b>${esc(x.core)}</b><span style="flex:1"></span><button class="primary" data-pload="${i}">载入过渡 + 终局</button></div>
+      ${x.trans ? `<div class="stl">过渡 <span class="muted">DPS ${f0(x.tev.dps)} · 带到终局的 ${x.trans.filter(n => fin.has(n)).length} 人</span></div>${teamRow(x.trans, fin)}${bondsRow(x.tev.res)}`
+        : `<div class="stl">过渡 <span class="muted">≤ ${TIERS[(+PLAN.tTier||3)-1]} 阶的【${esc(x.core)}】干员不足 ${THRESH[x.core][0]} 人，凑不出过渡阵容</span></div>`}
+      <div class="stl">终局 <span class="muted">DPS ${f0(x.ev.dps)}${kill ? " · " + kill : ""}</span></div>
+      ${teamRow(x.team)}
+      ${bondsRow(x.ev.res)}
       ${PLAN.waves.length ? `<div class="pchk">${waveChecks(x.team, F)}</div>` : ""}
       ${spare.length ? `<div class="sub">其他可用【${esc(x.core)}】干员：${spare.map(esc).join("、")}</div>` : ""}
     </div>`;
@@ -1495,25 +1607,37 @@ function buildPlan(){
       const idx = PLAN.waves.map((x,i) => x === t ? i + 1 : 0).filter(Boolean);
       return `<div class="pw"><b>${t}</b><span class="muted">第 ${idx.join("、")} 波 · 平均生命 ${f0(a.hp)} · 防御 ${f0(a.def)} · 法抗 ${f0(a.res)}</span><div>${esc(I.d||"")}。${esc(I.tip||"")}。</div></div>`; }).join("");
   }
-  // 我保存的阵容本局能不能用
+  // 我保存的阵容本局能不能用（两个阶段都算）
   const all = savedAll(), ks = Object.keys(all);
   if (ks.length){
-    const chk = ks.map(k => { const L = all[k];
-      const units = [...(L.field||[]), ...(L.bench||[])].filter(u => u && OPS[u.name]);
-      const bad = units.filter(u => opBanned(u.name)).map(u => u.name);
-      return {k, bad, n:units.length}; }).sort((a,b) => a.bad.length - b.bad.length);
+    const chk = ks.map(k => { const L = all[k], A = L.alt || {};
+      const units = [...(L.field||[]), ...(L.bench||[]), ...(A.field||[]), ...(A.bench||[])].filter(u => u && OPS[u.name]);
+      const bad = [...new Set(units.filter(u => opBanned(u.name)).map(u => u.name))];
+      return {k, bad, n:new Set(units.map(u => u.name)).size}; }).sort((a,b) => a.bad.length - b.bad.length);
     html += `<h3 class="psh">我的阵容本局可用吗</h3>` + chk.map(c => `<div class="pl ${c.bad.length?"bad":"ok"}"><span>${c.bad.length ? "✗" : "✓"}</span><b>${esc(c.k)}</b><span class="muted">${c.bad.length ? `被禁 ${c.bad.length} 人：${c.bad.map(esc).join("、")}` : `${c.n} 人都能用`}</span><span style="flex:1"></span><button data-plib="${esc(c.k)}">载入</button></div>`).join("");
   }
   planCache = {key, html};
   $("planOut").innerHTML = html;
 }
-let planRows = [];
-function loadPlanTeam(team){
-  if ([...S.field, ...S.bench].some(Boolean) && !confirm("用这套推荐替换当前阵容？当前阵容没保存的改动会丢失。")) return;
+const unitsOf = team => { const f = Array(9).fill(null); team.forEach((n,i) => f[i] = {name:n, elite:false, equips:[]}); return f; };
+function loadPlanTeam(r){
+  if ([...S.field, ...S.bench, ...S.alt.field, ...S.alt.bench].some(Boolean) && !confirm("用这套推荐替换当前阵容（过渡和终局两个阶段）？没保存的改动会丢失。")) return;
   const L = emptyLineup();
-  team.forEach((n,i) => L.field[i] = {name:n, elite:false, equips:[]});
+  L.name = `${r.core}（推荐）`;
+  if (r.trans){ L.stage = "过渡"; L.field = unitsOf(r.trans); L.alt.field = unitsOf(r.team); }
+  else { L.stage = "终局"; L.field = unitsOf(r.team); }
   if (PLAN.boss){ L.boss.name = PLAN.boss; L.boss.mode = PLAN.mode; }
-  S = L; selected = null; refreshSaved(); render(); if (isPhone()) setView("board"); toast("已载入推荐阵容");
+  S = L; selected = null; refreshSaved(); render(); if (isPhone()) setView("board"); toast(r.trans ? "已载入，当前显示过渡阵容" : "已载入终局阵容");
+}
+function loadGoalTeam(x){
+  const cap = fieldCap(), keep = PLAN.gLock;
+  const cur = S.field.slice(0, cap).filter(Boolean);
+  if (!keep && cur.length && !confirm(`用方案替换当前${S.stage}阶段的战场？`)) return;
+  const old = {}; cur.forEach(u => old[u.name] = u);
+  const f = Array(9).fill(null);
+  x.team.forEach((n,i) => f[i] = old[n] || {name:n, elite:false, equips:[]});
+  if (keep){ let j = x.team.length; cur.forEach(u => { if (!x.team.includes(u.name) && j < cap) f[j++] = u; }); }
+  S.field = f; selected = null; render(); if (isPhone()) setView("board"); toast(`方案已放上${S.stage}阶段的战场`);
 }
 $("tab-plan").addEventListener("click", e => {
   const t = e.target;
@@ -1521,15 +1645,19 @@ $("tab-plan").addEventListener("click", e => {
   if (pb){ const [kind, b] = pb.dataset.pban.split(":"); const a = PLAN[kind];
     if (a.includes(b)) a.splice(a.indexOf(b), 1); else { if (a.length >= 5) return toast("每局最多禁 5 个"); a.push(b); }
     savePlan(); renderPlan(); return; }
+  const pg = t.closest("[data-pgoal]");
+  if (pg){ const b = pg.dataset.pgoal, n = THRESH[b].length; PLAN.goals = {...(PLAN.goals||{})}; PLAN.goals[b] = ((PLAN.goals[b]||0) + 1) % (n + 1); if (!PLAN.goals[b]) delete PLAN.goals[b]; savePlan(); renderPlan(); return; }
+  if (t.closest("[data-pgclear]")){ PLAN.goals = {}; savePlan(); renderPlan(); return; }
   const pw = t.closest("[data-pwave]"); if (pw){ PLAN.waves.push(pw.dataset.pwave); savePlan(); renderPlan(); return; }
   const pd = t.closest("[data-pwdel]"); if (pd){ PLAN.waves.splice(+pd.dataset.pwdel, 1); savePlan(); renderPlan(); return; }
-  if (t.closest("[data-preset]")){ if (!confirm("清空禁用盟约、首领和波次？")) return; PLAN = {...DEFAULT_PLAN, banCore:[], banSub:[], waves:[]}; savePlan(); renderPlan(); return; }
-  const pl = t.closest("[data-pload]"); if (pl){ const r = planRows[+pl.dataset.pload]; if (r) loadPlanTeam(r.team); return; }
+  if (t.closest("[data-preset]")){ if (!confirm("清空禁用盟约、首领和波次？（目标盟约和过渡设置保留）")) return; PLAN = {...PLAN, banCore:[], banSub:[], waves:[], boss:""}; savePlan(); renderPlan(); return; }
+  const pl = t.closest("[data-pload]"); if (pl){ const r = planRows[+pl.dataset.pload]; if (r) loadPlanTeam(r); return; }
+  const gl = t.closest("[data-pgload]"); if (gl){ const x = goalRows[+gl.dataset.pgload]; if (x) loadGoalTeam(x); return; }
   const lb = t.closest("[data-plib]"); if (lb){ const k = lb.dataset.plib; S = normalize(savedAll()[k]); selected = null; refreshSaved(k); render(); if (isPhone()) setView("board"); toast("已载入：" + k); }
 });
 $("tab-plan").addEventListener("change", e => {
   const s = e.target.closest("[data-pk]"); if (!s) return;
-  PLAN[s.dataset.pk] = s.value; savePlan(); renderPlan();
+  PLAN[s.dataset.pk] = s.type === "checkbox" ? s.checked : s.value; savePlan(); renderPlan();
 });
 
 function render(){
@@ -1621,6 +1749,12 @@ $("tierbar").addEventListener("click", e => { const b = e.target.closest("button
   });
 });
 
+function switchStage(st){
+  if (st === S.stage) return;
+  const a = S.alt; S.alt = {field:S.field, bench:S.bench}; S.field = a.field; S.bench = a.bench; S.stage = st;
+  selected = null; render(); toast(`切换到${st}阵容`);
+}
+$("stSeg").addEventListener("click", e => { const b = e.target.closest("[data-st]"); if (b) switchStage(b.dataset.st); });
 $("bvSeg").addEventListener("click", e => {
   const b = e.target.closest("[data-bv]"); if (!b) return;
   compactBoard = b.dataset.bv === "1"; store.set("wsxy-compact", compactBoard); render();
@@ -1814,17 +1948,26 @@ $("btnSave").addEventListener("click", () => {
 });
 // ===== 阵容库：所有保存的阵容（简洁版）=====
 function libCardHTML(k, L){
-  const keep = S; let st, N;
-  try { S = normalize(L); N = S; st = compute(); } finally { S = keep; }
+  const keep = S; const parts = [];
+  let N;
+  try {
+    S = normalize(L); N = S;
+    const boards = {[N.stage]:{field:N.field, bench:N.bench}, [otherStage(N.stage)]:N.alt};
+    STAGES.forEach(st => { const B = boards[st]; if (![...B.field, ...B.bench].some(Boolean)) return; S.field = B.field; S.bench = B.bench; parts.push({st, B, state:compute()}); });
+  } finally { S = keep; }
   const cap = N.deploy9 ? 9 : 8;
   const lm = u => `<div class="lm" style="--tc:${TC[OPS[u.name].tier]}" title="${esc(u.name)}${u.elite?"（精锐）":""}"><img src="${avatar(u.name)}" alt="" loading="lazy"><div>${esc(u.name)}</div></div>`;
-  const f = N.field.slice(0, cap).filter(Boolean), b = N.bench.filter(Boolean);
-  return `<div class="libc ${k===S.name?"cur":""}">
-    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">场上 ${f.length}/${cap}${b.length?` · 整备 ${b.length}`:""}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
-      <button class="primary" data-lload="${esc(k)}">载入</button><button data-ldel="${esc(k)}">删除</button></div>
-    <div class="lf">${f.map(lm).join("") || '<span class="muted" style="font-size:12px">战场为空</span>'}</div>
+  const two = parts.length > 1;
+  const body = parts.map(({st, B, state}) => { const f = B.field.slice(0, cap).filter(Boolean), b = B.bench.filter(Boolean);
+    return `${two ? `<div class="stl">${st}</div>` : ""}<div class="lf">${f.map(lm).join("") || '<span class="muted" style="font-size:12px">战场为空</span>'}</div>
     ${b.length ? `<div class="sub">整备区</div><div class="lf bn">${b.map(lm).join("")}</div>` : ""}
-    ${compactBondsHTML(st)}
+    ${compactBondsHTML(state)}`; }).join("");
+  const main = parts.find(p => p.st === N.stage) || parts[0];
+  const fN = main ? main.B.field.slice(0, cap).filter(Boolean).length : 0;
+  return `<div class="libc ${k===S.name?"cur":""}">
+    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">${two ? "过渡 + 终局" : `场上 ${fN}/${cap}`}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
+      <button class="primary" data-lload="${esc(k)}">载入</button><button data-ldel="${esc(k)}">删除</button></div>
+    ${body || '<span class="muted" style="font-size:12px">空阵容</span>'}
   </div>`;
 }
 function renderLib(){
