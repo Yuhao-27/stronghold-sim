@@ -121,6 +121,12 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .rres{border:1px solid;border-radius:4px;padding:0 6px;font-weight:bold}
 .recr .ra{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
 .recr .ra img{width:26px;height:26px;border-radius:4px;border:1px solid var(--tc,var(--line))}
+.recr .ra img.el,.recr .ra .rx.el{box-shadow:0 0 0 1px var(--t5)}
+.recr .ra .rx{height:26px;line-height:24px;padding:0 5px;border-radius:4px;border:1px dashed var(--line);font-size:11px;color:var(--muted)}
+.sksrc{font-size:11px;padding:0 5px;border-radius:4px;border:1px solid var(--accent2);color:var(--muted)}
+.skp ol{margin:0;padding-left:20px;line-height:1.7;font-size:12px}
+.skp code{font-size:11px;background:var(--panel2);padding:0 4px;border-radius:3px;word-break:break-all}
+.skp textarea{width:100%;box-sizing:border-box;font-size:12px;background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px}
 .recr .rm{color:var(--muted);margin-top:4px;line-height:1.5}
 .stt{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
 .stt div{border:1px solid var(--line);border-radius:8px;background:var(--panel2);padding:8px;text-align:center}
@@ -494,6 +500,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 <script src="enemies.js"></script>
 <script src="strategies.js"></script>
 <script src="pinyin.js"></script>
+<script src="skland_ids.js"></script>
 <script src="calc.js"></script>
 <script>
 "use strict";
@@ -1176,6 +1183,7 @@ const RULES_HTML = `
   <li><b>修补</b>：阵容里有人本局拿不到（被禁、要策略）时，在购买清单、阵容库或对局规划「我的阵容本局可用吗」里点「修补」：先换成可用的备选，再按原阵容的盟约档位从可用干员里补人，其他人和位置、装备不动；结果作为当前阵容载入，原阵容不变，会提示哪些盟约档位没保住。</li>
   <li><b>分享</b>：顶部「分享」或阵容库卡片上的「分享」生成链接（阵容压缩在网址里，不经过服务器），对方打开就能载入。「导出 / 导入」是所有阵容的 JSON 备份。</li>
   <li><b>搜索与筛选</b>：干员池、装备、阵容库的搜索都支持拼音全拼和首字母（如 fz、fuzou → 复奏）。干员池「更多筛选」可按第二个盟约、特质类型、触发时机筛，或只看本局能拿到的、隐藏阵容里已有的；本局被禁的干员会变暗并标「禁」。阵容库可按本局可用 / 不可用、包含的盟约筛选。</li>
+  <li><b>从森空岛导入</b>（战绩 → 从森空岛导入）：森空岛「卫戍协议·规程」页上的历史对局可以导进来。在电脑浏览器打开森空岛的卫戍攻略编辑页并登录，用开发者工具（F12 → 网络）找到 history-log 请求，复制它的「响应」粘贴进来即可。会带上阵容、精锐、装备、结束时的盟约层数、策略、模式、首领（是否击杀）、回合数、击倒数、花费和用时；没有禁用信息。森空岛的自选干员不在本工具的干员表里，只显示名字。编号对照来自 StrongholdAssistant（Apache-2.0）。</li>
   <li><b>对局记录 / 战绩</b>（顶部「战绩」、手机底部「战绩」、对局规划「本局结束 · 记录结果」）：一局打完后点「通关」或「失败」就保存，阵容（终局）、激活的盟约、策略、禁用、模式和首领自动带上，回合数和备注可不填；默认同时清空本局信息，方便下一局。「战绩」页按模式筛选，看总通关率、平均回合、最近 10 局，以及按核心盟约、策略、干员、首领分别统计。记录只存在这台设备上，可用「导出 / 导入」备份或换设备（顶部的导出也会带上记录）。</li>
   <li><b>变形同构体</b>（对局规划）：设置最多几个变形后，终局推荐和目标盟约搜索会考虑让某名干员带「变形同构体 + 对应装备」多拿一个盟约（例如差 1 人到下一档时）。卡片上写明谁带哪件装备，载入时自动装上。被禁的盟约不能作为变形目标；过渡阵容不用变形（同构体是 6 阶装备）。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
@@ -2391,7 +2399,7 @@ window.addEventListener("hashchange", openShared);
 // ===== 对局记录 / 战绩：一局结束点一下结果就保存，其他信息自动带上 =====
 const recAll = () => store.get("wsxy-records", []);
 const recSave = rs => store.set("wsxy-records", rs);
-let recV = "stats", recModeF = "", recFormOpen = false;
+let recV = "stats", recModeF = "", recFormOpen = false, recSkOpen = false;
 const recPref = store.get("wsxy-recpref", {clear:true});
 function recPack(B){ return a => a.map(u => u ? {n:u.name, e:u.elite?1:0, q:(u.equips||[]).filter(Boolean)} : null); }
 // 阵容快照：用终局（终局是空的就用当前阶段）
@@ -2406,7 +2414,7 @@ function recSnap(L0){
   const pk = recPack();
   return {name:L.name || "", f:pk(B.field), b:pk(B.bench), bonds, core, strat:L.strat || ""};
 }
-const recOps = r => [...r.f, ...r.b].filter(u => u && OPS[u.n] && !OPS[u.n].wild).map(u => u.n);
+const recOps = r => [...r.f, ...r.b].filter(u => u && u.n && !(OPS[u.n] && OPS[u.n].wild)).map(u => u.n);
 function recSourceOpts(){
   const all = savedAll();
   return `<option value="__cur">当前阵容${S.name ? `「${esc(S.name)}」` : ""}</option>` + Object.keys(all).sort((a,b) => a.localeCompare(b, "zh")).map(k => `<option value="${esc(k)}">${esc(k)}</option>`).join("");
@@ -2422,7 +2430,8 @@ function recSummary(){
 }
 function renderRecForm(){
   const el = $("recForm");
-  if (!recFormOpen){ el.innerHTML = `<button type="button" class="primary" id="rfOpen" style="width:100%">＋ 记一局</button>`; return; }
+  if (recSkOpen){ el.innerHTML = skPanelHTML(); return; }
+  if (!recFormOpen){ el.innerHTML = `<div style="display:flex;gap:8px"><button type="button" class="primary" id="rfOpen" style="flex:1">＋ 记一局</button><button type="button" id="skOpen" style="flex:1">从森空岛导入</button></div>`; return; }
   el.innerHTML = `<div class="rf">
     <div class="rfh"><b>记一局</b><span class="muted" style="font-size:12px">阵容、策略、禁用、模式、首领自动带上，点结果就保存</span><span style="flex:1"></span><button type="button" id="rfHide" style="font-size:12px;padding:2px 8px">收起</button></div>
     <label>阵容<select id="rfL">${recSourceOpts()}</select></label>
@@ -2480,11 +2489,12 @@ function renderRec(){
   if (recV === "list"){
     body.innerHTML = rs.slice().reverse().map(r => {
       const d = new Date(r.t), when = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-      const ops = [...r.f, ...r.b].filter(u => u && OPS[u.n]);
+      const ops = [...r.f, ...r.b].filter(u => u && u.n);
+      const sk = r.src === "skland", bl = r.bosses && r.bosses.length ? r.bosses.map(x => `${esc(x.n)}${x.k ? "✓" : "✗"}`).join(" ") : r.boss && esc(r.boss);
       const bans = [...(r.banCore || []), ...(r.banSub || [])];
-      return `<div class="recr"><div class="rh"><span class="rres ${r.win ? "win" : "lose"}">${r.win ? "通关" : "失败"}</span>${r.round ? `<span>第 ${r.round} 回合</span>` : ""}<b>${esc(r.core || r.name || "阵容")}</b><span class="muted">${when}</span><span style="flex:1"></span><button type="button" data-rload="${esc(r.id)}">载入阵容</button><button type="button" data-rdel="${esc(r.id)}">删除</button></div>
-        <div class="ra">${ops.map(u => `<img src="${avatar(u.n)}" style="--tc:${TC[OPS[u.n].tier]}" title="${esc(u.n)}${u.e ? "（精锐）" : ""}">`).join("")}</div>
-        <div class="rm">${[r.name && `阵容「${esc(r.name)}」`, r.bonds && r.bonds.length && r.bonds.slice(0, 5).map(([b, l]) => `${esc(b)}${"Ⅰ Ⅱ Ⅲ".split(" ")[l - 1] || l}`).join(" "), r.strat && `策略「${esc(r.strat)}」`, bans.length && `禁 ${bans.map(esc).join("、")}`, r.mode && esc(r.mode), r.boss && `首领 ${esc(r.boss)}`, r.note && `备注：${esc(r.note)}`].filter(Boolean).join(" · ")}</div></div>`;
+      return `<div class="recr"><div class="rh"><span class="rres ${r.win ? "win" : "lose"}">${r.win ? "通关" : "失败"}</span>${r.round ? `<span>第 ${r.round} 回合</span>` : ""}${sk ? `<span class="sksrc">森空岛</span>` : ""}<b>${esc(r.core || r.name || "阵容")}</b><span class="muted">${when}</span><span style="flex:1"></span><button type="button" data-rload="${esc(r.id)}">载入阵容</button><button type="button" data-rdel="${esc(r.id)}">删除</button></div>
+        <div class="ra">${ops.map(u => OPS[u.n] ? `<img src="${avatar(u.n)}" class="${u.e ? "el" : ""}" style="--tc:${TC[OPS[u.n].tier]}" title="${esc(u.n)}${u.e ? "（精锐）" : ""}">` : `<span class="rx${u.e ? " el" : ""}" title="${esc(u.n)}（自选干员）">${esc(u.n)}</span>`).join("")}</div>
+        <div class="rm">${[r.name && `阵容「${esc(r.name)}」`, r.layers && Object.keys(r.layers).length ? Object.entries(r.layers).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([b, l]) => `${esc(b)} ${l}层`).join(" ") : r.bonds && r.bonds.length && r.bonds.slice(0, 5).map(([b, l]) => `${esc(b)}${"Ⅰ Ⅱ Ⅲ".split(" ")[l - 1] || l}`).join(" "), r.strat && `策略「${esc(r.strat)}」`, bans.length && `禁 ${bans.map(esc).join("、")}`, r.mode && esc(r.mode), bl && `首领 ${bl}`, r.kills != null && `击倒 ${r.kills}`, r.coin != null && `花费 ${r.coin}`, r.dur && `${Math.round(r.dur / 60)} 分钟`, r.note && `备注：${esc(r.note)}`].filter(Boolean).join(" · ")}</div></div>`;
     }).join("");
     return;
   }
@@ -2493,9 +2503,66 @@ function renderRec(){
     + recTable("按核心盟约", recAgg(rs, r => r.core))
     + recTable("按策略", recAgg(rs, r => r.strat || "（没选策略）"))
     + recTable("按干员", recAgg(rs, recOps), "出场 2 局以上，按出场次数排", 2, 15)
-    + recTable("按首领", recAgg(rs, r => r.boss))
+    + recTable("按首领", recAgg(rs, r => r.bosses && r.bosses.length ? r.bosses.map(x => x.n) : r.boss), "这局遇到过这个首领")
     + (modes.length > 1 && !recModeF ? recTable("按模式", recAgg(rs, r => r.mode)) : "")
     + `<div class="muted" style="font-size:11px;margin-top:10px">条形和百分比是通关率；「均 x 回」只算填了回合数的局。局数少的时候波动很大，参考就好。</div>`;
+}
+// ===== 森空岛战绩导入：粘贴 history-log 的响应（JSON），在本机转换，不经过任何服务器 =====
+const SK = window.SKID || {op:{}, eq:{}, bond:{}, strat:{}, boss:{}};
+const SK_DIFF = {FUNNY:"标准模拟", NORMAL:"险境模拟", HARD:"绝境模拟", ABYSS:"终极模拟"};
+function skMode(t, d){
+  t = String(t || ""); d = String(d || "");
+  if (t === "MULTI") return SK_DIFF[d] || `联机 ${d}`;
+  if (t === "SINGLE"){ if (d === "FUNNY") return "极速模拟"; const m = d.match(/\d+/); if (m) return "规程等级" + m[0]; return "单人 " + (SK_DIFF[d] || d); }
+  return [t, d].filter(Boolean).join(" ");
+}
+function skOpName(id){ let n = SK.op[id] || id; if (!OPS[n] && OPS["“" + n + "”"]) n = "“" + n + "”"; return n; }
+const skBond = id => { id = String(id || "").replace(/Ship$/, ""); return SK.bond[id] || id; };
+function skRecordsOf(txt){
+  let j; try { j = typeof txt === "string" ? JSON.parse(txt.trim()) : txt; } catch(_){ return null; }
+  const list = Array.isArray(j) ? j : j && j.data && Array.isArray(j.data.records) ? j.data.records : j && Array.isArray(j.records) ? j.records : null;
+  return list && list.length && list.every(x => x && Array.isArray(x.chessSquad)) ? list : null;
+}
+function skRecord(x){
+  const sq = x.chessSquad.map(o => ({n: skOpName(o.charId), e: o.chessInfo && o.chessId && o.chessId === o.chessInfo.goldenChessId ? 1 : 0,
+    q: (o.equips || []).map(e => SK.eq[e.equipId] || e.equipId)}));
+  const f = Array(9).fill(null), b = Array(BENCH_SIZE).fill(null);
+  sq.forEach((u, i) => { if (i < 9) f[i] = u; else if (i - 9 < BENCH_SIZE) b[i - 9] = u; });
+  const L = emptyLineup(), un = u => u && OPS[u.n] ? {name:u.n, elite:!!u.e, equips:u.q.filter(q => EQUIP[q])} : null;
+  L.field = f.map(un); L.bench = b.map(un); L.strat = SK.strat[x.bandId] || "";
+  const sn = recSnap(L), layers = {};
+  (x.bondInfo || []).forEach(y => { const n = skBond(y.bondId); if (+y.layer > 0 && (y.activate == null || +y.activate)) layers[n] = +y.layer; });
+  const core = sn.core || (Object.keys(layers).find(n => CORE.includes(n)) || "");
+  const bosses = (x.acBossInfo || []).map(y => ({n: SK.boss[y.bossId] || y.bossId, k: !!y.isKilled}));
+  const end = +x.gameEndTs || 0, start = +x.gameStartTs || 0;
+  return {id: "sk_" + x.id, src: "skland", t: new Date((end || start) * 1000).toISOString(), win: +x.completeState === 1,
+    round: +x.passRound || null, note: "", name: "", f, b, bonds: sn.bonds, core, layers,
+    strat: SK.strat[x.bandId] || (x.bandId ? x.bandId : ""), banCore: [], banSub: [],
+    mode: skMode(x.modeType, x.modeDifficulty), boss: bosses[0] ? bosses[0].n : "", bosses,
+    coin: x.coinCost != null ? +x.coinCost : null, kills: x.killCnt != null ? +x.killCnt : null, dur: end && start && end > start ? end - start : null};
+}
+function skImportText(txt){
+  const list = skRecordsOf(txt);
+  if (!list){ toast(txt && txt.trim() ? "认不出来：要粘贴 history-log 的「响应」内容" : "先把内容粘贴到框里"); return; }
+  let recs; try { recs = list.map(skRecord); } catch(e){ toast("数据格式和预期不一样，导入失败"); return; }
+  const unknown = new Set(); recs.forEach(r => [...r.f, ...r.b].forEach(u => { if (u && /^char_/.test(u.n)) unknown.add(u.n); }));
+  const n = recMerge(recs);
+  recSkOpen = false; recV = "stats"; renderRec();
+  toast(`读到 ${list.length} 局，新增 ${n} 局` + (unknown.size ? `；${unknown.size} 个干员编号没对上` : ""));
+}
+function skPanelHTML(){
+  return `<div class="rf skp">
+    <div class="rfh"><b>从森空岛导入以前的对局</b><span style="flex:1"></span><button type="button" id="skHide" style="font-size:12px;padding:2px 8px">收起</button></div>
+    <ol>
+      <li>在<b>电脑</b>浏览器（Chrome / Edge）打开 <code>game.skland.com/arknights/stronghold-guide/edit</code>，登录森空岛。</li>
+      <li>按 <b>F12</b> → 选「网络 / Network」→ 在过滤框输入 <code>history-log</code> → 按 <b>F5</b> 刷新页面。</li>
+      <li>点出现的 <code>history-log</code> 那一行 →「响应 / Response」→ 在里面按 Ctrl+A、Ctrl+C 复制。</li>
+      <li>粘贴到下面的框里，点「导入」。</li>
+    </ol>
+    <div class="muted" style="font-size:12px">只复制「响应」里的内容，不要复制请求头（里面有你的登录凭证）。数据只在这台设备上转换和保存，不会上传。<br>要用在手机上：电脑上导入后点右上角「导出」，把文件发到手机，在手机上点「导入」选这个文件。重复导入不会重复记。</div>
+    <textarea id="skText" rows="4" placeholder='粘贴在这里，开头一般是 {"code":0,"message":"OK","data":{"records":[…'></textarea>
+    <div class="rfb"><button type="button" class="primary" id="skGo">导入</button><button type="button" id="skFile">选文件…</button></div>
+  </div>`;
 }
 function recLoad(id){
   const r = recAll().find(x => x.id === id); if (!r) return;
@@ -2506,7 +2573,7 @@ function recLoad(id){
   S = normalize(L); selected = null; refreshSaved(); render(); closeRec(); if (isPhone()) setView("board"); toast("已载入，需要的话点保存");
 }
 function openRec(form){ recFormOpen = !!form || recFormOpen; $("rec").style.display = "flex"; renderRec(); }
-function closeRec(){ $("rec").style.display = "none"; recFormOpen = false; }
+function closeRec(){ $("rec").style.display = "none"; recFormOpen = false; recSkOpen = false; }
 $("btnRec").addEventListener("click", () => openRec(false));
 $("mnav").addEventListener("click", e => { if (e.target.closest("[data-rec]")) openRec(false); });
 document.addEventListener("click", e => { if (e.target.closest("[data-recnow]")) openRec(true); });
@@ -2516,6 +2583,10 @@ $("rec").addEventListener("click", e => {
   if (t === $("rec")) return closeRec();
   if (t.closest("#rfOpen")){ recFormOpen = true; return renderRecForm(); }
   if (t.closest("#rfHide")){ recFormOpen = false; return renderRecForm(); }
+  if (t.closest("#skOpen")){ recSkOpen = true; recFormOpen = false; return renderRecForm(); }
+  if (t.closest("#skHide")){ recSkOpen = false; return renderRecForm(); }
+  if (t.closest("#skGo")) return skImportText($("skText").value);
+  if (t.closest("#skFile")) return $("recFile").click();
   const wb = t.closest("[data-rwin]"); if (wb) return recAdd(wb.dataset.rwin === "1");
   const sv = t.closest("[data-rv]"); if (sv){ recV = sv.dataset.rv; return renderRec(); }
   const ld = t.closest("[data-rload]"); if (ld) return recLoad(ld.dataset.rload);
@@ -2533,7 +2604,9 @@ $("recExp").addEventListener("click", () => {
 $("recImp").addEventListener("click", () => $("recFile").click());
 $("recFile").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { const j = JSON.parse(await f.text()); const list = Array.isArray(j) ? j : j.records; if (!Array.isArray(list)) throw 0; const n = recMerge(list); renderRec(); toast(n ? `已导入 ${n} 条记录` : "没有新的记录（都已存在）"); }
+  const txt = await f.text();
+  if (skRecordsOf(txt)){ skImportText(txt); e.target.value = ""; return; }
+  try { const j = JSON.parse(txt); const list = Array.isArray(j) ? j : j.records; if (!Array.isArray(list)) throw 0; const n = recMerge(list); renderRec(); toast(n ? `已导入 ${n} 条记录` : "没有新的记录（都已存在）"); }
   catch(_){ toast("导入失败：不是对局记录文件"); }
   e.target.value = "";
 });
