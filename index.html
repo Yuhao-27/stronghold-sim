@@ -160,6 +160,14 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .verdict.ok{background:rgba(8,216,165,.12);border-color:rgba(8,216,165,.5)}
 .verdict.warn{background:rgba(249,169,15,.12);border-color:rgba(249,169,15,.5)}
 .verdict.bad{background:rgba(230,102,102,.13);border-color:rgba(230,102,102,.55)}
+.rtpl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;font-size:13px}
+.rtpl input[type=search]{flex:1;min-width:120px}
+.radd summary{cursor:pointer;font-size:13px;color:var(--accent);margin:4px 0}
+#rchips{display:flex;flex-wrap:wrap;gap:4px;max-height:260px;overflow:auto;padding:2px}
+.rchip{display:flex;align-items:center;gap:4px;padding:2px 8px 2px 2px;font-size:12px;border-radius:14px}
+.rchip img{width:24px;height:24px;border-radius:50%;background:#0b1013}
+.rtable input,.rtable select{padding:2px 4px}
+#roundBox table img{width:24px;height:24px;border-radius:4px;vertical-align:middle;margin-right:4px}
 #dpsTable img,#bossBox table img{width:24px;height:24px;border-radius:4px;vertical-align:middle;margin-right:4px}
 .rules h3{font-size:14px;margin:14px 0 6px;color:var(--accent)}
 .rules li{margin:3px 0}
@@ -272,6 +280,8 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
       <div style="overflow:auto"><table id="dpsTable"></table></div>
       <h2 style="margin-top:18px">领袖击杀模拟 <small>当前阵容需要多久打掉 Boss</small></h2>
       <div id="bossBox"></div>
+      <h2 style="margin-top:18px">回合模拟 <small>自定义一轮敌人，看当前阵容输出够不够</small></h2>
+      <div id="roundBox"></div>
     </div>
   </section>
 </main>
@@ -295,6 +305,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 <script src="data.js"></script>
 <script src="stats.js"></script>
 <script src="bosses.js"></script>
+<script src="enemies.js"></script>
 <script src="calc.js"></script>
 <script>
 "use strict";
@@ -333,7 +344,8 @@ const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 
 /* ---------------- state ---------------- */
 const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
 const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
-function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}}; }
+const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
+function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}}; }
 let S = emptyLineup();
 let selected = null; // {zone, idx}
 const store = {
@@ -345,6 +357,8 @@ function normalize(L){
   n.name = L.name || ""; n.deploy9 = !!L.deploy9; n.layers = L.layers || {}; n.temp = +L.temp || 0;
   n.calc = {...DEFAULT_CALC, ...(L.calc||{})};
   n.boss = {...DEFAULT_BOSS, ...(L.boss||{})}; n.boss.opts = {...(n.boss.opts||{})};
+  n.round = {...DEFAULT_ROUND, ...(L.round||{})};
+  n.round.rows = (n.round.rows||[]).filter(x => x && ENEMIES.enemies[x.name]).map(x => ({name:x.name, n:Math.max(0, +x.n||0), lv:+x.lv||0, hp:x.hp ?? ""}));
   const fix = u => {
     if (!u || !OPS[u.name]) return null;
     const r = {name:u.name, elite:!!u.elite, equips:(u.equips||[]).slice(0, slotCount(u.name, u.elite))};
@@ -627,6 +641,7 @@ function renderDps(state){
   $("dpsTable").innerHTML = `<tr><th>干员</th><th>生命</th><th>攻击</th><th>防御</th><th>间隔</th><th title="普攻状态下的 DPS">普攻DPS</th><th title="技能期间 DPS；+N/次 为开启瞬间的爆发伤害；蓄力型技能显示单次伤害">技能DPS</th><th title="x 秒内普攻造成的伤害 ÷ x">${S.calc.x}s普攻</th><th title="x 秒内技能造成的伤害 ÷ x">${S.calc.x}s技能</th><th>${S.calc.x}s均值</th><th>技能次数</th></tr>${rows || '<tr><td colspan="11" class="muted">战场上还没有干员</td></tr>'}
     ${rows?`<tr><td><b>合计（不含治疗）</b></td><td colspan="6"></td><td><b>${f0(sumN)}</b></td><td><b>${f0(sumS)}</b></td><td><b>${f0(sum)}</b></td><td></td></tr>`:""}`;
   renderBoss(state);
+  renderRound(state);
 }
 
 // ===== 领袖击杀模拟 =====
@@ -733,6 +748,102 @@ function renderBoss(state){
   $("bossBox").innerHTML = html;
 }
 
+// ===== 回合模拟 =====
+const enemyAvatar = n => "avatars/enemy/" + encodeURIComponent(n) + ".png";
+const roundLimit = r => (ENEMIES.limits.find(([a,b]) => r >= a && r <= b) || [0,0,115])[2];
+const roundT = () => +S.round.limit || roundLimit(+S.round.r || 1);
+function enemyStat(row){
+  const E = ENEMIES.enemies[row.name], L = E.lv.find(l => l.i === row.lv) || E.lv[0];
+  const sc = (+S.round.scale || 100) / 100;
+  const hp0 = row.hp !== "" && row.hp != null ? +row.hp : L.hp;
+  return {E, L, hp: hp0 * sc, def: (L.def||0) * sc, res: L.res||0};
+}
+function roundSim(state){
+  const T = roundT(), ctx = {...ctxFor(state), horizon:T}, tg = Math.max(1, +S.calc.targets || 1);
+  const units = [];
+  S.field.slice(0, fieldCap()).forEach((u,i) => {
+    if (!u) return;
+    const R = CALC.evaluate(u, {zone:"field", idx:i}, ctx);
+    // 近战位干员打不到空中敌人（特性写明可远程攻击的除外，如领主）；资料缺失时按能打到算
+    const src = (window.STATS && STATS.src && STATS.src[(STATS.map||{})[u.name] ?? u.name]) || {};
+    R.air = src.pos !== "近战位" || /远程攻击/.test(src.trait || "");
+    if (!R.error && !R.heal) units.push(R);
+  });
+  const rows = S.round.rows.filter(x => x.n > 0).map(row => {
+    const st = enemyStat(row), en = {def:st.def, res:st.res}, nT = Math.min(tg, row.n);
+    const fly = /飞行|空/.test(st.E.move), us = fly ? units.filter(R => R.air) : units;
+    const dmg = us.reduce((a,R) => a + R.damageIn(R.rates(en, nT), 0, T), 0);
+    const one = us.reduce((a,R) => a + R.damageIn(R.rates(en, 1), 0, T), 0);
+    const each = dmg > 0 ? st.hp / (dmg / T) : Infinity;   // 平均每只占用的秒数（含群攻分摊）
+    return {row, st, dps: dmg / T, sdps: one / T, each, time: each * row.n, kill1: one > 0 ? st.hp / (one / T) : Infinity};
+  });
+  const need = rows.reduce((a,x) => a + x.time, 0), total = rows.reduce((a,x) => a + x.row.n, 0);
+  // 输出不够时：按“先打最快能打死的”贪心估算时限内能击倒几只
+  let left = T, killed = 0;
+  rows.slice().sort((a,b) => a.each - b.each).forEach(x => { const k = Math.min(x.row.n, Math.floor(left / x.each + 1e-9)); killed += k; left -= k * x.each; });
+  return {T, units, rows, need, total, leak: total - killed};
+}
+function renderRound(state){
+  const R = S.round, T = roundT();
+  const rOpts = Array.from({length:13}, (_,i) => i+1).map(r => `<option value="${r}"${r === +R.r ? " selected" : ""}>第 ${r} 回合（${roundLimit(r)} 秒）</option>`).join("");
+  const groups = Object.keys(ENEMIES.r2024), tg = groups.includes(R.tg) ? R.tg : groups[0];
+  const trs = ENEMIES.r2024[tg].map(x => x.r), tr = trs.includes(R.tr) ? R.tr : trs[0];
+  const cats = ["全部", ...Object.keys(ENEMIES.pool), ...groups.map(g => "2024·" + g)];
+  let html = `<div class="grid" id="roundSettings">
+    <label>回合${`<select data-rs="r">${rOpts}</select>`}</label>
+    <label title="留空=按 PRTS 回合时限">时限（秒）<input type="number" min="1" step="5" data-rs="limit" value="${esc(R.limit ?? "")}" placeholder="${roundLimit(+R.r||1)}"></label>
+    <label title="同时作用于生命值和防御力，例如某模式敌人属性降至 70% 就填 70">敌人属性倍率 %<input type="number" min="1" step="5" data-rs="scale" value="${R.scale}"></label>
+  </div>
+  <div class="rtpl"><span class="muted">2024 回合模板：</span><select data-rs="tg">${groups.map(g => `<option${g===tg?" selected":""}>${g}</option>`).join("")}</select><select data-rs="tr">${trs.map(r => `<option${r===tr?" selected":""}>${r}</option>`).join("")}</select><button type="button" data-rload>载入（替换当前敌人）</button><button type="button" data-rclear>清空</button></div>
+  <details class="radd"${R.rows.length ? "" : " open"}><summary>添加敌人</summary>
+    <div class="rtpl"><select data-rs="cat">${cats.map(c => `<option${c===R.cat?" selected":""}>${c}</option>`).join("")}</select><input type="search" id="rq" placeholder="搜索敌人名…"></div>
+    <div id="rchips"></div>
+  </details>`;
+  if (!R.rows.length){ $("roundBox").innerHTML = html + `<div class="muted" style="font-size:12px;margin-top:6px">从上面的敌人池添加敌人，或载入 2024 年的某一回合作为模板。当前赛季 PRTS 只有按类别列出的敌人池，没有逐回合的数量。</div>`; renderChips(); return; }
+  const Rs = roundSim(state);
+  html += `<table class="rtable" style="margin-top:6px"><tr><th>敌人</th><th>数量</th><th>级别</th><th title="留空=资料值；倍率另算">生命</th><th>防御 / 法抗</th><th title="全队对该敌人的平均有效 DPS（群攻按“敌人数量（群攻）”设置与该敌人数量取小）">对其DPS</th><th title="全队集火打死一只的平均用时">单只用时</th><th title="这一组敌人总共占用的输出时间">合计用时</th><th></th></tr>${
+    R.rows.map((row, i) => {
+      const x = Rs.rows.find(y => y.row === row), st = enemyStat(row), E = st.E;
+      const lv = E.lv.length > 1 ? `<select data-ri="${i}" data-k="lv">${E.lv.map(l => `<option value="${l.i}"${l.i===row.lv?" selected":""}>${l.i}</option>`).join("")}</select>` : `<span class="muted">${E.lv[0].i}</span>`;
+      const tag = [E.rank && E.rank !== "普通" ? E.rank : "", /飞行|空/.test(E.move) ? "飞行" : ""].filter(Boolean).join("·");
+      return `<tr><td><img src="${enemyAvatar(row.name)}" alt="">${esc(row.name)}${tag ? ` <span class="muted">${esc(tag)}</span>` : ""}</td>
+        <td><input type="number" min="0" step="1" data-ri="${i}" data-k="n" value="${row.n}" style="width:4em"></td><td>${lv}</td>
+        <td><input type="number" min="0" step="100" data-ri="${i}" data-k="hp" value="${esc(row.hp ?? "")}" placeholder="${st.L.hp}" style="width:6.5em"></td>
+        <td>${f0(st.def)} / ${f0(st.res)}</td>
+        <td>${x ? f0(x.dps) : "—"}</td><td>${x && isFinite(x.kill1) ? x.kill1.toFixed(1) + "s" : "—"}</td><td>${x && isFinite(x.time) ? x.time.toFixed(1) + "s" : "—"}</td>
+        <td><button type="button" data-rdel="${i}" title="移除">✕</button></td></tr>`;
+    }).join("")}
+    <tr><td><b>合计</b></td><td><b>${Rs.total}</b></td><td colspan="5"></td><td><b>${isFinite(Rs.need) ? Rs.need.toFixed(1) + "s" : "—"}</b></td><td></td></tr></table>`;
+  let V;
+  const slow = Rs.rows.filter(x => x.kill1 > T);
+  if (!Rs.units.length) V = null;
+  else if (!isFinite(Rs.need)) V = {cls:"bad", head:"❌ 打不动", text:"至少有一种敌人对全队的有效伤害为 0（可能防御/法抗太高或全是治疗）。"};
+  else {
+    const k = Rs.need / T, leak = Math.min(10, Rs.leak);
+    if (k <= 0.8) V = {cls:"ok", head:"✅ 输出充裕", text:`估计约 ${Rs.need.toFixed(0)} 秒处理完，时限 ${T} 秒，还有 ${((1/k - 1)*100).toFixed(0)}% 余量。`};
+    else if (k <= 1) V = {cls:"warn", head:"⚠️ 勉强够", text:`估计约 ${Rs.need.toFixed(0)} 秒处理完，时限 ${T} 秒。敌人分批到场、走位分路时容易漏怪。`};
+    else V = {cls:"bad", head:"❌ 输出不足", text:`需要约 ${Rs.need.toFixed(0)} 秒，时限 ${T} 秒，输出需达到现在的 ×${k.toFixed(2)}。估计漏 ${Rs.leak} 只，扣 ${leak} 点目标生命值（每回合最多 10）。`};
+    if (V && slow.length) V.text += `<br>集火也要超过时限才能打死：${slow.map(x => `${esc(x.row.name)}（${x.kill1.toFixed(0)}秒）`).join("、")}。`;
+  }
+  if (V) html += `<div class="verdict ${V.cls}"><b>${V.head}</b> ${V.text}</div>`;
+  const tpl = (ENEMIES.r2024[tg] || []).find(x => x.r === tr);
+  html += `<div class="muted" style="font-size:12px;margin-top:6px">估算方法：全队输出按时间分给每种敌人（群攻按设置的敌人数量分摊），总用时与回合时限比较；空中敌人只计远程位干员（及特性可远程攻击的近战位）的输出；不模拟出怪节奏、走位、阻挡、分路和敌人技能，属于偏乐观的估计。回合时限取自 PRTS「卫戍协议/帮助」。${tpl && tpl.notes.length ? `<br>模板 ${esc(tg)} ${esc(tr)} 备注：${tpl.notes.map(esc).join("；")}` : ""}</div>`;
+  $("roundBox").innerHTML = html;
+  renderChips();
+}
+function renderChips(){
+  const box = $("rchips"); if (!box) return;
+  const R = S.round, q = ($("rq")?.value || "").trim();
+  let names;
+  if (R.cat in ENEMIES.pool) names = ENEMIES.pool[R.cat];
+  else if (R.cat.startsWith("2024·")) { const s = new Set(); (ENEMIES.r2024[R.cat.slice(5)]||[]).forEach(r => r.en.forEach(e => s.add(e.name))); names = [...s]; }
+  else names = Object.keys(ENEMIES.enemies);
+  names = names.filter(n => ENEMIES.enemies[n] && (!q || n.includes(q)));
+  box.innerHTML = names.slice(0, 120).map(n => `<button type="button" class="rchip" data-radd="${esc(n)}" title="${esc(n)}：生命 ${ENEMIES.enemies[n].lv[0].hp}，防御 ${ENEMIES.enemies[n].lv[0].def}，法抗 ${ENEMIES.enemies[n].lv[0].res}"><img src="${enemyAvatar(n)}" alt="" loading="lazy"><span>${esc(n)}</span></button>`).join("")
+    + (names.length > 120 ? `<div class="muted" style="font-size:12px">还有 ${names.length - 120} 个，请用搜索缩小范围</div>` : "")
+    + (!names.length ? `<div class="muted" style="font-size:12px">没有匹配的敌人</div>` : "");
+}
+
 const RULES_HTML = `
 <h3>装备合成（模拟器暂不计算）</h3>
 <ul>
@@ -774,6 +885,7 @@ const RULES_HTML = `
   <li>生命值按所选难度/规程等级取表；防御/法抗取自敌人页面级别数据，可手动覆盖。</li>
   <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
+  <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
   <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
 </ul>`;
@@ -908,6 +1020,38 @@ $("bossBox").addEventListener("change", e => {
   else bs[k] = Math.max(0, +t.value||0);
   render();
 });
+$("roundBox").addEventListener("click", e => {
+  const R = S.round, t = e.target;
+  const add = t.closest("[data-radd]");
+  if (add){ const n = add.dataset.radd, ex = R.rows.find(x => x.name === n); if (ex) ex.n++; else R.rows.push({name:n, n:1, lv:ENEMIES.enemies[n].lv[0].i, hp:""}); render(); toast(`已添加：${n}`); return; }
+  const del = t.closest("[data-rdel]");
+  if (del){ R.rows.splice(+del.dataset.rdel, 1); render(); return; }
+  if (t.closest("[data-rclear]")){ R.rows = []; render(); return; }
+  if (t.closest("[data-rload]")){
+    const groups = Object.keys(ENEMIES.r2024), tg = groups.includes(R.tg) ? R.tg : groups[0];
+    const rd = ENEMIES.r2024[tg].find(x => x.r === R.tr) || ENEMIES.r2024[tg][0];
+    R.tg = tg; R.tr = rd.r;
+    R.rows = rd.en.filter(e => ENEMIES.enemies[e.name] && e.n > 0).map(e => ({name:e.name, n:e.n, lv:ENEMIES.enemies[e.name].lv.some(l => l.i === e.lv) ? e.lv : ENEMIES.enemies[e.name].lv[0].i, hp:e.hp ?? ""}));
+    const rn = parseInt(rd.r.replace(/\D/g, "")); if (rn >= 1 && rn <= 13) R.r = rn;
+    render(); toast(`已载入 ${tg} ${rd.r}`); return;
+  }
+});
+$("roundBox").addEventListener("change", e => {
+  const R = S.round, t = e.target;
+  if (t.dataset.ri != null){
+    const row = R.rows[+t.dataset.ri]; if (!row) return;
+    if (t.dataset.k === "hp") row.hp = t.value === "" ? "" : Math.max(0, +t.value||0);
+    else row[t.dataset.k] = Math.max(0, +t.value||0);
+    render(); return;
+  }
+  const k = t.dataset.rs; if (!k) return;
+  if (k === "limit") R.limit = t.value === "" ? "" : Math.max(1, +t.value||0);
+  else if (k === "r" || k === "scale") R[k] = Math.max(1, +t.value||1);
+  else R[k] = t.value;
+  if (k === "cat"){ renderChips(); return; }
+  render();
+});
+$("roundBox").addEventListener("input", e => { if (e.target.id === "rq") renderChips(); });
 $("dpsTable").addEventListener("click", e => {
   const tr = e.target.closest("[data-sel]"); if (!tr) return;
   selected = {zone:"field", idx:+tr.dataset.sel}; render();
