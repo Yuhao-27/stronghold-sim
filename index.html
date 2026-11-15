@@ -45,6 +45,30 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .tile{position:relative;cursor:pointer;text-align:center;border-radius:6px;padding:2px;background:var(--panel2);border:1px solid transparent}
 .tile:hover{border-color:var(--accent)}
 .tile .so{position:absolute;right:2px;top:2px;font-size:9px;padding:0 3px;border-radius:3px;background:#3a2a10;color:var(--t5);border:1px solid var(--t5);line-height:13px}
+.isol b{color:var(--text);font-weight:normal}
+.rep{margin:2px 0 8px 18px;padding:8px;border:1px dashed var(--line);border-radius:6px;font-size:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.rep .stl{font-size:11px;color:var(--accent);font-weight:bold}.rep s{color:var(--muted)}.rep .warn{color:#ff9b7d}.rep .okt{color:var(--accent)}.rep button{margin-top:4px;font-size:12px}
+.libf{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line)}.libf input{flex:1;min-width:160px}
+.lst{font-size:12px;margin:-2px 0 6px}.lst.bad{color:#ff9b7d}.lst.ok{color:var(--accent)}.lst button{font-size:11px;padding:1px 8px;margin-left:4px}
+.strow2{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px}
+.strow2 select{font-size:12px;padding:3px 6px;margin-left:auto}
+.card .cand{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnd{display:inline-flex;gap:4px;align-items:center;padding:2px 2px 2px 2px;font-size:12px;border:1px solid var(--line);border-left:3px solid var(--tc);border-radius:6px;background:var(--panel2)}
+.cnd img{width:24px;height:24px;border-radius:4px}.cnd button{padding:0 6px;font-size:11px}.cnd i.bad,.shi i.bad{font-style:normal;color:#ff9b7d;font-size:11px}
+.shoph{cursor:pointer;margin-bottom:6px}.shoph .warn{color:#ff9b7d;font-size:12px}
+.pbar{display:inline-block;width:70px;height:6px;border-radius:3px;background:#24343a;overflow:hidden;flex:none}.pbar i{display:block;height:100%;background:var(--accent)}
+.shl{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px}
+.shi{display:grid;grid-template-columns:30px 1fr auto;grid-template-rows:auto auto;column-gap:6px;align-items:center;text-align:left;padding:3px 6px 3px 3px;border-left:3px solid var(--tc);font-size:12px;min-width:0}
+.shi img{width:30px;height:30px;border-radius:4px;grid-row:1/3}.shi .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.shi .t{font-size:11px;color:var(--muted)}
+.shi small,.shi i{grid-column:2/4;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:normal}
+.shi i.ok{grid-column:3;grid-row:1;color:var(--accent);font-weight:bold;font-size:14px}
+.shi.got{background:#123a31;border-color:var(--accent)}.shi.got .nm{color:var(--accent)}
+.shi.ban{opacity:.75}.shi.ban .nm{text-decoration:line-through}
+#shopBox .stl{font-size:11px;color:var(--accent);font-weight:bold;margin:8px 0 3px}
+.shf{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:12px}.shf button{font-size:12px}
+.frow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px}.frow select{max-width:100%}
+#adv{display:flex;flex-direction:column;gap:6px}#adv[hidden]{display:none}
+.tile.ban{opacity:.4}.tile.ban::before{content:"禁";position:absolute;right:2px;bottom:16px;font-size:10px;padding:0 3px;border-radius:3px;background:#5a1f12;color:#ff9b7d}
 .srow{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:13px}
 .srow label{display:flex;gap:6px;align-items:center;font-weight:bold;white-space:nowrap;flex:none}
 .srow select{max-width:180px;font-weight:normal}
@@ -326,9 +350,10 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   <span class="grow"></span>
   <label title="人事部文档：最大可部署人数变为9"><input type="checkbox" id="deploy9"> 人事部文档（部署上限9）</label>
   <button id="btnLib">阵容库</button>
+  <button id="btnShare" title="把当前阵容做成链接发给别人，打开就能载入">分享</button>
   <button id="btnRules">规则说明</button>
-  <button id="btnExport">导出</button>
-  <button id="btnImport">导入</button>
+  <button id="btnExport" title="所有阵容导出为 JSON 文件（备份）">导出</button>
+  <button id="btnImport" title="从 JSON 文件导入阵容">导入</button>
   <input type="file" id="fileIn" accept=".json" hidden>
 </header>
 
@@ -336,9 +361,14 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   <section class="panel" id="pool">
     <h2>干员池 <small id="poolCount"></small></h2>
     <div class="filters">
-      <input type="text" id="q" placeholder="搜索干员名…">
+      <input type="text" id="q" placeholder="搜索干员名，支持拼音（如 fz / fuzou）">
       <div class="tierbar" id="tierbar"></div>
-      <select id="bondFilter"><option value="">全部盟约</option></select>
+      <div class="frow"><select id="bondFilter"><option value="">全部盟约</option></select><button type="button" id="advBtn">更多筛选 ▾</button></div>
+      <div id="adv" hidden>
+        <div class="frow"><select id="bondFilter2" title="同时拥有这个盟约"><option value="">且有盟约…</option></select>
+          <select id="fType"><option value="">特质类型</option></select><select id="fTime"><option value="">触发时机</option></select></div>
+        <div class="frow"><label><input type="checkbox" id="fRun"> 只看本局能拿到的</label><label><input type="checkbox" id="fHide"> 隐藏阵容里已有的</label><button type="button" id="fReset">重置</button></div>
+      </div>
       <div class="muted" style="font-size:12px">点击加入战场（满了进整备区），也可以拖到任意空位。选了盟约后，第一格“任意【盟约】”是不指定人选的占位</div>
     </div>
     <div id="poolGrid"></div>
@@ -347,14 +377,16 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   <section id="boardSec">
     <div class="panel">
       <div class="srow" id="stratRow"><label>策略<select id="stratSel"></select></label><div class="muted" id="stratEff"></div></div><div class="warn" id="stratWarn" hidden></div>
+      <div class="strow2"><span class="muted">阶段</span><div class="seg" id="stSeg" title="每个阵容有前期、过渡、终局三套站位，盟约和计算按当前阶段"><button type="button" data-st="前期">前期</button><button type="button" data-st="过渡">过渡</button><button type="button" data-st="终局">终局</button></div>
+        <select id="stCopy" title="把当前阶段的战场和整备区复制到另一个阶段"></select></div>
       <div class="zone-h"><b>战场</b><span class="muted" id="fieldCount"></span><span style="flex:1"></span>
-        <div class="seg" id="stSeg" title="每个阵容有过渡、终局两套站位，盟约和计算按当前阶段"><button type="button" data-st="过渡">过渡</button><button type="button" data-st="终局">终局</button></div>
         <div class="seg" id="bvSeg" title="简洁版只显示头像和盟约，点头像进入完整版"><button type="button" data-bv="1">简洁</button><button type="button" data-bv="0">完整</button></div></div>
       <div class="slots" id="field"></div>
       <div id="cbonds"></div>
       <div class="zone-h"><b>整备区</b><span class="muted bhint">【远见】【奇迹】【投资人】干员在整备区也计入盟约</span></div>
       <div class="slots" id="bench"></div>
     </div>
+    <div class="panel" id="shopBox" style="margin-top:12px"></div>
     <div class="panel" id="recoBox" style="margin-top:12px"></div>
     <div class="panel" id="detail" style="margin-top:12px"><span class="muted">点选一名干员查看特质与装备</span></div>
   </section>
@@ -392,6 +424,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
       <h2>对局规划 <small>按本局禁用、首领和波次推荐阵容</small></h2>
       <div id="planIn"></div>
       <div id="planOut" style="margin-top:12px"></div>
+      <div id="planMine"></div>
     </div>
   </section>
 </main>
@@ -406,6 +439,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 </div></div>
 <div id="lib" style="position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:56;padding:16px"><div class="box" style="background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(1100px,100%);max-height:90vh;display:flex;flex-direction:column">
   <div class="mh" style="display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--line)"><b>阵容库</b><span class="muted" id="libCount" style="font-size:12px"></span><span style="flex:1"></span><button id="libClose">关闭</button></div>
+  <div class="libf"><input type="text" id="libQ" placeholder="搜阵容名或干员（支持拼音）"><div class="seg" id="libSeg"><button type="button" data-lf="all" class="on">全部</button><button type="button" data-lf="ok">本局可用</button><button type="button" data-lf="bad">不可用</button></div><select id="libBond"><option value="">含盟约…</option></select></div>
   <div style="overflow:auto;padding:12px" id="libBody"></div>
 </div></div>
 <div id="tip"></div>
@@ -422,6 +456,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 <script src="bosses.js"></script>
 <script src="enemies.js"></script>
 <script src="strategies.js"></script>
+<script src="pinyin.js"></script>
 <script src="calc.js"></script>
 <script>
 "use strict";
@@ -462,6 +497,13 @@ THRESH["独行"] = [1];
 const wildSvg = b => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="10" fill="#1d2a30"/><rect x="4" y="4" width="92" height="92" rx="8" fill="none" stroke="#5d7680" stroke-width="3" stroke-dasharray="9 6"/><text x="50" y="46" font-size="40" text-anchor="middle" fill="#8a9aa1" font-family="sans-serif">?</text><text x="50" y="${b.length > 3 ? 80 : 82}" font-size="${b.length > 3 ? 17 : 22}" text-anchor="middle" fill="#e6ecee" font-family="sans-serif" font-weight="bold">${b}</text></svg>`);
 const avatar = n => OPS[n] && OPS[n].wild ? wildSvg(OPS[n].wild) : "avatars/" + encodeURIComponent(n) + ".png";
 const bossAvatar = n => "avatars/boss/" + encodeURIComponent(n) + ".png";
+// 拼音搜索：名字包含 / 全拼包含 / 首字母包含
+const PYX = {}; Object.entries(window.PY || {}).forEach(([k, v]) => { const [full, ini] = v.split("|"); PYX[k] = {full, ini}; });
+function pyMatch(name, q){
+  if (!q) return true; if (name.includes(q)) return true;
+  const p = PYX[name]; if (!p) return false;
+  const ql = q.toLowerCase().replace(/[^a-z0-9]/g, ""); return !!ql && (p.full.includes(ql) || p.ini.includes(ql));
+}
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function isoBondOf(eqName){
   if (!eqName) return null;
@@ -476,8 +518,12 @@ const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
 const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
 const DEFAULT_RECO = {tier:6, pick:"", all:false};
-function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}, stage:"终局", alt:{field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null)}, strat:""}; }
-const STAGES = ["过渡","终局"], otherStage = st => st === "过渡" ? "终局" : "过渡";
+// 阶段：前期 / 过渡 / 终局。正在编辑的阶段放在 field/bench，其余阶段放在 alts[阶段]
+const STAGES = ["前期","过渡","终局"];
+const blankBoard = () => ({field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null)});
+function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}, stage:"终局", alts:{前期:blankBoard(), 过渡:blankBoard()}, strat:""}; }
+const boardsOf = L => STAGES.map(st => ({st, B: st === L.stage ? {field:L.field, bench:L.bench} : L.alts[st]}));
+const unitsAll = L => boardsOf(L).flatMap(({B}) => [...B.field, ...B.bench]).filter(Boolean);
 let S = emptyLineup();
 let selected = null; // {zone, idx}
 const store = {
@@ -497,15 +543,19 @@ function normalize(L){
     if (!u || !OPS[u.name]) return null;
     const r = {name:u.name, elite:!!u.elite, equips:(u.equips||[]).slice(0, slotCount(u.name, u.elite))};
     ["skill","mod","conds","skp","manual"].forEach(k => { if (u[k] !== undefined) r[k] = u[k]; });
+    if (Array.isArray(u.cand)){ const c = [...new Set(u.cand)].filter(x => OPS[x] && !OPS[x].wild && x !== u.name).slice(0, 4); if (c.length) r.cand = c; }
     return r;
   };
   (L.field||[]).slice(0,9).forEach((u,i) => n.field[i] = fix(u));
   (L.bench||[]).slice(0,BENCH_SIZE).forEach((u,i) => n.bench[i] = fix(u));
-  // 阶段：当前编辑的是 stage，另一阶段存在 alt
-  n.stage = L.stage === "过渡" ? "过渡" : "终局";
-  const A = L.alt || {};
-  (A.field||[]).slice(0,9).forEach((u,i) => n.alt.field[i] = fix(u));
-  (A.bench||[]).slice(0,BENCH_SIZE).forEach((u,i) => n.alt.bench[i] = fix(u));
+  // 阶段：当前编辑的是 stage，其他阶段存在 alts（旧版只有 alt = 过渡/终局 中的另一个）
+  n.stage = STAGES.includes(L.stage) ? L.stage : "终局";
+  const src = {...(L.alts || {})};
+  if (L.alt && !L.alts) src[n.stage === "过渡" ? "终局" : "过渡"] = L.alt;
+  n.alts = {};
+  STAGES.filter(st => st !== n.stage).forEach(st => { const A = src[st] || {}, B = n.alts[st] = blankBoard();
+    (A.field||[]).slice(0,9).forEach((u,i) => B.field[i] = fix(u));
+    (A.bench||[]).slice(0,BENCH_SIZE).forEach((u,i) => B.bench[i] = fix(u)); });
   return n;
 }
 const fieldCap = () => S.deploy9 ? 9 : 8;
@@ -576,10 +626,15 @@ function effectHTML(text, layers, total){
 const $ = id => document.getElementById(id);
 let tierOn = new Set();
 function renderPool(){
-  const q = $("q").value.trim(), bf = $("bondFilter").value;
+  const q = $("q").value.trim(), bf = $("bondFilter").value, bf2 = $("bondFilter2").value, ft = $("fType").value, tm = $("fTime").value;
   const used = new Set([...S.field, ...S.bench].filter(Boolean).map(u=>u.name));
+  const run = $("fRun").checked, hide = $("fHide").checked, anyBan = PLAN.banCore.length + PLAN.banSub.length > 0;
   const list = D.operators.filter(o =>
-    (!q || o.name.includes(q)) && (!tierOn.size || tierOn.has(o.tier)) && (!bf || o.bonds.includes(bf)));
+    pyMatch(o.name, q) && (!tierOn.size || tierOn.has(o.tier)) && (!bf || o.bonds.includes(bf)) && (!bf2 || o.bonds.includes(bf2))
+    && (!ft || o.trait_type === ft) && (!tm || (o.trait || "").includes(tm) || (o.trait_elite || "").includes(tm))
+    && (!run || runOK(o.name)) && (!hide || !used.has(o.name)));
+  const nAdv = [bf2, ft, tm, run, hide].filter(Boolean).length;
+  $("advBtn").textContent = `更多筛选${nAdv ? `（${nAdv}）` : ""} ${$("adv").hidden ? "▾" : "▴"}`;
   $("poolCount").textContent = `${list.length} / ${D.operators.length}`;
   const w = bf && OPS[WILD(bf)];
   $("poolGrid").innerHTML = (w ? `
@@ -588,7 +643,7 @@ function renderPool(){
       <img src="${avatar(w.name)}" alt="">
       <div class="nm">任意【${esc(bf)}】</div>
     </div>` : "") + list.map(o => `
-    <div class="tile ${used.has(o.name)?"used":""}" draggable="true" data-op="${esc(o.name)}" style="--tc:${TC[o.tier]}">
+    <div class="tile ${used.has(o.name)?"used":""} ${anyBan && opBanned(o.name) ? "ban" : ""}" draggable="true" data-op="${esc(o.name)}" style="--tc:${TC[o.tier]}">
       <span class="tb">${o.tier}</span>${STRAT_ONLY[o.name] ? `<span class="so" title="商店买不到，只能通过策略「${esc(STRAT_ONLY[o.name])}」获得${o.name==="“暴躁铁皮”"?"（之后可对它用简易电话再拿一个）":""}">策略</span>` : ""}
       <img src="${avatar(o.name)}" alt="" loading="lazy">
       <div class="nm">${esc(o.name)}</div>
@@ -617,6 +672,7 @@ function cardHTML(u, zone, idx, bondState){
       <div style="min-width:0"><div class="nm">${esc(u.name)}</div><div class="meta">${o.wild ? "占位 · 人选不限" : `${o.tier} 阶 · ${esc(o.trait_type||"")}`}</div>
       <div class="ctrl"><button data-act="elite" class="${u.elite?"elite-on":""}" title="切换精锐状态">★精锐</button><button data-act="swap" title="${zone==="field"?"移到整备区":"移到战场"}">${zone==="field"?"↓整备":"↑上场"}</button><button data-act="remove" title="移除">✕</button></div></div></div>
     <div class="chips">${base.map(b=>chip(b,false)).join("")}${iso.map(b=>chip(b,true)).join("")}</div>
+    ${u.cand && u.cand.length ? `<div class="cand" title="备选干员">备：${u.cand.map(esc).join("、")}</div>` : ""}
     <div class="equips">${eqs}</div>
   </div>`;
 }
@@ -637,8 +693,9 @@ function renderBoard(state){
   const bs = state.res;
   $("boardSec").classList.toggle("compact", compactBoard);
   document.querySelectorAll("#bvSeg [data-bv]").forEach(b => b.classList.toggle("on", (b.dataset.bv === "1") === compactBoard));
-  const altN = S.alt.field.filter(Boolean).length;
-  document.querySelectorAll("#stSeg [data-st]").forEach(b => { b.classList.toggle("on", b.dataset.st === S.stage); b.textContent = b.dataset.st + (b.dataset.st !== S.stage && altN ? `·${altN}` : ""); });
+  document.querySelectorAll("#stSeg [data-st]").forEach(b => { const st = b.dataset.st, n = st === S.stage ? 0 : S.alts[st].field.filter(Boolean).length;
+    b.classList.toggle("on", st === S.stage); b.textContent = st + (n ? `·${n}` : ""); });
+  $("stCopy").innerHTML = `<option value="">复制到…</option>` + STAGES.filter(st => st !== S.stage).map(st => `<option value="${st}">复制到${st}</option>`).join("");
   const body = (u, z, i) => !u ? "" : compactBoard ? miniHTML(u) : cardHTML(u, z, i, bs);
   $("field").innerHTML = S.field.slice(0,cap).map((u,i) =>
     `<div class="slot ${u?"":"empty"}" data-zone="field" data-idx="${i}">${body(u,"field",i)}</div>`).join("");
@@ -697,10 +754,23 @@ function renderDetail(){
       <div class="chips" style="margin-top:4px">${base.map(b=>`<span class="chip ${CORE.includes(b)?"core":""}">${esc(b)}</span>`).join("")}${iso.map(b=>`<span class="chip iso">${esc(b)}（同构）</span>`).join("")}</div></div></div>
     <div class="row"><div class="trait ${u.elite?"":"active"}"><b>普通特质</b><div>${esc(o.trait)}</div></div>
     ${o.trait_elite?`<div class="trait ${u.elite?"active":""}"><b>精锐特质</b><div>${esc(o.trait_elite)}</div></div>`:""}</div>
+    ${candRowHTML(u)}
     <div class="row"><b>装备</b>（${slotCount(u.name, u.elite)} 栏）${u.equips.includes(ISO)?"":' <span class="muted">— 携带“变形同构体”加一件对应装备即可获得额外盟约</span>'}${eqList||'<div class="muted">未携带装备</div>'}</div>
     <div class="calc">${calcHTML(u)}</div>`;
 }
 
+// 备选干员：这个位置拿不到 / 被禁时用谁顶上
+function candRowHTML(u){
+  const cs = u.cand || [], mine = new Set(OPS[u.name].bonds);
+  const others = D.operators.filter(o => o.name !== u.name && !cs.includes(o.name));
+  const share = o => o.bonds.filter(b => mine.has(b)).length;
+  const opt = o => `<option value="${esc(o.name)}">${esc(o.name)} · ${o.tier} · ${esc(o.bonds.join("/"))}</option>`;
+  const same = others.filter(o => share(o)).sort((a,b) => share(b) - share(a) || TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier));
+  const rest = others.filter(o => !share(o));
+  return `<div class="row"><b>备选干员</b> <span class="muted" style="font-size:12px">这个位置拿不到或被禁时用谁顶上；购买清单和修补会优先用</span>
+    ${cs.length ? `<div class="fillc">${cs.map(n => `<span class="cnd" style="--tc:${TC[OPS[n].tier]}"><img src="${avatar(n)}" alt="">${esc(n)}${opBanned(n) ? '<i class="bad">本局被禁</i>' : ""}<button type="button" data-cswap="${esc(n)}" title="换上这名干员（保留精锐状态和装备）">换上</button><button type="button" data-cdel="${esc(n)}" title="移除备选">×</button></span>`).join("")}</div>` : ""}
+    ${cs.length < 4 ? `<select data-cadd="1" style="margin-top:6px;max-width:100%"><option value="">＋ 添加备选…</option><optgroup label="有相同盟约">${same.map(opt).join("")}</optgroup><optgroup label="其他">${rest.map(opt).join("")}</optgroup></select>` : ""}</div>`;
+}
 function renderWildDetail(el, u){
   const b = OPS[u.name].wild;
   const used = new Set([...S.field, ...S.bench].filter(Boolean).map(x => x.name));
@@ -1063,7 +1133,13 @@ const RULES_HTML = `
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
   <li><b>简洁 / 完整</b>：战场右上角切换。简洁版只显示头像和盟约汇总（已激活的、差 1~2 人的），点头像回到完整版并打开该干员明细。<b>阵容库</b>（顶部按钮 / 手机底栏）用简洁版列出所有保存的阵容，可直接载入或删除。</li>
-  <li><b>过渡 / 终局</b>：战场右上角切换。每个阵容有两套站位，盟约、DPS、装备推荐都按当前阶段计算，保存和阵容库会同时保留两套。</li>
+  <li><b>前期 / 过渡 / 终局</b>：战场上方切换。每个阵容有三套站位，盟约、DPS、装备推荐都按当前阶段计算，保存和阵容库会保留所有阶段。「复制到…」把当前阶段整套复制到另一个阶段，方便在前期基础上改出过渡。</li>
+  <li><b>备选干员</b>：点开干员明细，在「备选干员」里给这个位置加最多 4 个替补（没拿到或被禁时用谁顶上），点「换上」直接替换（保留精锐和装备，原来的人留作备选）。</li>
+  <li><b>购买清单</b>（战场下方）：列出当前阵容各阶段要买的人，按阶段和阶级排，点一下记为已拿到，顶部显示进度。被禁或要策略才有的人会标出来，并提示可用的备选；勾选只存在这台设备上，「清空本局信息」会一起清掉。</li>
+  <li><b>修补</b>：阵容里有人本局拿不到（被禁、要策略）时，在购买清单、阵容库或对局规划「我的阵容本局可用吗」里点「修补」：先换成可用的备选，再按原阵容的盟约档位从可用干员里补人，其他人和位置、装备不动；结果作为当前阵容载入，原阵容不变，会提示哪些盟约档位没保住。</li>
+  <li><b>分享</b>：顶部「分享」或阵容库卡片上的「分享」生成链接（阵容压缩在网址里，不经过服务器），对方打开就能载入。「导出 / 导入」是所有阵容的 JSON 备份。</li>
+  <li><b>搜索与筛选</b>：干员池、装备、阵容库的搜索都支持拼音全拼和首字母（如 fz、fuzou → 复奏）。干员池「更多筛选」可按第二个盟约、特质类型、触发时机筛，或只看本局能拿到的、隐藏阵容里已有的；本局被禁的干员会变暗并标「禁」。阵容库可按本局可用 / 不可用、包含的盟约筛选。</li>
+  <li><b>变形同构体</b>（对局规划）：设置最多几个变形后，终局推荐和目标盟约搜索会考虑让某名干员带「变形同构体 + 对应装备」多拿一个盟约（例如差 1 人到下一档时）。卡片上写明谁带哪件装备，载入时自动装上。被禁的盟约不能作为变形目标；过渡阵容不用变形（同构体是 6 阶装备）。</li>
   <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
   <li><b>策略</b>：战场上方选本阵容的策略。战斗类（众志合一、统御号令、以己之长、食腐之蝶）直接计入盟约 / 伤害计算，食腐之蝶默认不开，需要在效果里勾上；盟约类策略在对局规划里优先推荐对应核心盟约。“暴躁铁皮”和盟约·辅助干员商店买不到（干员池里标「策略」），只有选了对应策略（暴躁铁皮 / 优等生）才会出现在推荐里。</li>
   <li><b>对局规划</b>（盟约 / 计算 → 对局规划）：填本局禁用的核心盟约（≤5）、附加盟约（≤5）、首领和每波敌人特点。禁用规则：带任一被禁核心盟约的干员不出现；其他干员要全部盟约都被禁才不出现；被禁的盟约按无法激活处理。每个未被禁的核心盟约各给一套过渡阵容（阶级和人数可调，默认 ≤Ⅲ 阶 6 人，尽量沿用终局里的人）和终局 8 人阵容，可一键载入两个阶段；按盟约、波次需求（飞行要远程、隐匿要近战、元素/持续要医疗、致命/特异要重装……）、代入盟约后的全队 DPS 和首领击杀时间排序；不含装备和精锐。「按目标盟约找阵容」：点盟约切换要求的档位（如叙拉古Ⅱ + 坚守Ⅰ），搜索刚好达成所有目标的最少干员组合，剩下的位置给出补位建议（虚线框）；勾选「保留当前战场干员」可在已有阵容上补齐。下方还会列出已保存的阵容本局能不能用。本局信息单独保存，换阵容不会清掉。</li>
@@ -1309,7 +1385,7 @@ WAVE_TAGS.forEach(t => {
   const m = k => L.length ? L.reduce((a,x) => a + (+x[k]||0), 0) / L.length : 0;
   WAVE_AVG[t] = {hp:m("hp"), def:m("def"), res:m("res"), n:L.length};
 });
-const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟", tTier:3, tN:6, goals:{}, gTier:6, gLock:false, strat:""};
+const DEFAULT_PLAN = {banCore:[], banSub:[], waves:[], boss:"", mode:"险境模拟", tTier:3, tN:6, goals:{}, gTier:6, gLock:false, strat:"", iso:0};
 let PLAN = {...DEFAULT_PLAN, ...store.get("wsxy-plan", {})};
 const savePlan = () => store.set("wsxy-plan", PLAN);
 
@@ -1365,6 +1441,8 @@ function opFeatures(){
 
 // ---- 打分（只看场上若干人，近似：不计精锐/同构体/整备区） ----
 const BI = {}; D.bonds.forEach((b,i) => BI[b.name] = i);
+// 变形同构体：同构体 + 对应装备 → 携带者多一个盟约。ISO_EQ[盟约] = 对应装备
+const ISO_EQ = {}; Object.entries(D.isomorph).forEach(([e, b]) => { if (!ISO_EQ[b]) ISO_EQ[b] = e; });
 const tierOf = n => TIERS.indexOf(OPS[n].tier) + 1;
 function planModel(){
   const F = opFeatures(), B = planBoss();
@@ -1393,8 +1471,12 @@ function planModel(){
   const iHarm = BI["调和"], iSolo = BI["独行"], iSkill = BI["绝技"];
   const coreIdx = new Set(CORE.map(c => BI[c]));
   const TH = D.bonds.map(b => THRESH[b.name]);
-  function levels(team){
-    cnt.fill(0); team.forEach(n => OB[n].forEach(i => cnt[i]++));
+  // 可以变形成的盟约（被禁的不行）
+  const ISOI = Object.keys(ISO_EQ).filter(b => !bondBanned(b)).map(b => BI[b]);
+  const K = Math.max(0, Math.min(3, +PLAN.iso || 0));
+  // xs：变形额外加的盟约（每个 +1 人）
+  function levels(team, xs){
+    cnt.fill(0); team.forEach(n => OB[n].forEach(i => cnt[i]++)); if (xs) xs.forEach(i => cnt[i]++);
     const harm = cnt[iHarm] >= 1, L = new Int8Array(D.bonds.length);
     for (let i = 0; i < L.length; i++){
       if (!cnt[i] || i === iSkill) continue;
@@ -1406,8 +1488,8 @@ function planModel(){
     return L;
   }
   const zhong = PLAN.strat === "众志合一";
-  function score(team, ci){
-    const L = levels(team); let s = 0;
+  function score(team, ci, xs){
+    const L = levels(team, xs); let s = 0;
     for (let i = 0; i < L.length; i++) if (L[i]) s += coreIdx.has(i) ? 6 + 5 * (L[i] - 1) : 3 + 2 * (L[i] - 1);
     if (ci >= 0 && !L[ci]) s -= 100;
     if (zhong){ let n = 0; for (let i = 0; i < L.length; i++) if (L[i]) n++; s += n >= 5 ? 6 : n >= 4 ? 4.5 : n >= 3 ? 3 : 0; }
@@ -1423,9 +1505,30 @@ function planModel(){
     s += w("频次") * 0.6 * Math.min(4, fast);
     return s;
   }
-  // 以核心盟约 ci 为主（ci<0 不强制），从 pool 里挑 N 人；fixed 里的人不动；extra 额外加分
-  function bestTeam(ci, pool, N, {fixed = [], extra = null, swap = true} = {}){
-    const sc = t => score(t, ci) + (extra ? extra(t) : 0);
+  // 每个变形要有一名本身没有这个盟约、还没变形过的人来带
+  function isoAssign(team, xs){
+    const used = new Set(), out = [];
+    for (const i of xs){ const b = D.bonds[i].name;
+      const h = team.filter(n => !used.has(n) && !OPS[n].bonds.includes(b)).sort((a,c) => V[a] - V[c])[0];
+      if (!h) return null; used.add(h); out.push({n:h, b, eq:ISO_EQ[b]}); }
+    return out;
+  }
+  // 贪心挑变形：每个变形（同构体 + 一件装备）要带来足够收益才用
+  function isoPick(team, ci, extra, k = K){
+    const xs = []; if (!k || !ISOI.length) return xs;
+    const sc = x => score(team, ci, x) + (extra ? extra(team, x) : 0);
+    let cur = sc(xs);
+    for (let j = 0; j < k; j++){
+      let best = -1, bs = cur + 1.5;
+      for (const i of ISOI){ const x2 = xs.concat(i); if (!isoAssign(team, x2)) continue; const v = sc(x2); if (v > bs){ bs = v; best = i; } }
+      if (best < 0) break; xs.push(best); cur = bs;
+    }
+    return xs;
+  }
+  // 以核心盟约 ci 为主（ci<0 不强制），从 pool 里挑 N 人；fixed 里的人不动；extra 额外加分；iso = 最多几个变形
+  function bestTeam(ci, pool, N, {fixed = [], extra = null, swap = true, iso = 0} = {}){
+    let xs = [];
+    const sc = t => score(t, ci, xs) + (extra ? extra(t, xs) : 0);
     let team = fixed.slice(0, N);
     if (ci >= 0){
       const c = D.bonds[ci].name;
@@ -1438,7 +1541,7 @@ function planModel(){
       if (!best) break; team.push(best);
     }
     let cur = sc(team);
-    for (let it = 0; swap && it < 40; it++){
+    const improve = () => { for (let it = 0; swap && it < 40; it++){
       let bt = null, bs = cur;
       for (let k = fixed.length; k < team.length; k++) for (const n of pool){
         if (team.includes(n)) continue;
@@ -1446,10 +1549,12 @@ function planModel(){
         if (s > bs + 1e-6){ bs = s; bt = t2; }
       }
       if (!bt) break; team = bt; cur = bs;
-    }
-    return {team, score:cur};
+    } };
+    improve();
+    if (iso){ xs = isoPick(team, ci, extra, iso); if (xs.length){ cur = sc(team); improve(); xs = isoPick(team, ci, extra, iso); cur = sc(team); } }
+    return {team, score:cur, xs, isoList: xs.length ? isoAssign(team, xs) : []};
   }
-  return {F, B, avail, V, levels, score, bestTeam, coreIdx};
+  return {F, B, avail, V, levels, score, bestTeam, coreIdx, isoAssign, ISOI, K};
 }
 
 // 每个未被禁的核心盟约：终局 8 人 + 过渡（阶级、人数受限，尽量沿用终局里的人）
@@ -1460,11 +1565,11 @@ function planSearch(M){
   CORE.filter(c => !PLAN.banCore.includes(c)).forEach(c => {
     const ci = BI[c], own = avail.filter(n => OPS[n].bonds.includes(c));
     if (own.length < THRESH[c][0]) { out.push({core:c, team:null, own}); return; }
-    const fin = bestTeam(ci, avail, 8);
+    const fin = bestTeam(ci, avail, 8, {iso: M.K});
     const ownCheap = cheap.filter(n => OPS[n].bonds.includes(c));
     const keep = new Set(fin.team);
     const tr = ownCheap.length >= THRESH[c][0] ? bestTeam(ci, cheap, tN, {extra: t => 1.5 * t.filter(n => keep.has(n)).length}) : null;
-    out.push({core:c, team:fin.team, score:fin.score, own, trans:tr && tr.team});
+    out.push({core:c, team:fin.team, score:fin.score, own, trans:tr && tr.team, isoList:fin.isoList});
   });
   return out;
 }
@@ -1473,28 +1578,36 @@ function planSearch(M){
 function goalSearch(M){
   const goals = Object.entries(PLAN.goals || {}).filter(([b, l]) => l > 0 && BONDS[b] && !bondBanned(b)).map(([b, l]) => ({b, i:BI[b], need:THRESH[b][Math.min(l, THRESH[b].length) - 1], l:Math.min(l, THRESH[b].length)}));
   if (!goals.length) return null;
-  const {avail, V, levels, bestTeam} = M, cap = fieldCap();
+  const {avail, V, levels, bestTeam, isoAssign, ISOI, K} = M, cap = fieldCap();
   const gTier = +PLAN.gTier || 6;
   const locked = PLAN.gLock ? S.field.slice(0, cap).filter(u => u && !isWild(u)).map(u => u.name) : [];
   const pool = avail.filter(n => tierOf(n) <= gTier && !locked.includes(n));
   const harmOps = bondBanned("调和") ? [] : pool.filter(n => OPS[n].bonds.includes("调和"));
-  const met = t => { const L = levels(t); return goals.every(g => L[g.i] >= g.l); };
-  // 下界：剩余缺口最大的盟约还差几人（调和可替所有核心 +1，按 1 人算）
-  const deficit = t => { const c = {}; t.forEach(n => OPS[n].bonds.forEach(b => c[b] = (c[b]||0) + 1));
+  const met = (t, xs) => { const L = levels(t, xs); return goals.every(g => L[g.i] >= g.l); };
+  // 下界：剩余缺口最大的盟约还差几人（调和可替所有核心 +1，按 1 人算；变形每个 +1）
+  const deficit = (t, xs) => { const c = {}; t.forEach(n => OPS[n].bonds.forEach(b => c[b] = (c[b]||0) + 1)); xs.forEach(i => { const b = D.bonds[i].name; c[b] = (c[b]||0) + 1; });
     const harm = !bondBanned("调和") && (c["调和"]||0) >= 1;
     return goals.map(g => ({g, d: g.need - (c[g.b]||0) - (harm && CORE.includes(g.b) ? 1 : 0)})); };
   const sols = new Map(); let nodes = 0, best = Infinity;
   const NODE_MAX = 40000;
+  const isoSet = new Set(ISOI), xs = [];
   (function dfs(team){
     if (++nodes > NODE_MAX) return;
-    const ds = deficit(team), open = ds.filter(x => x.d > 0);
-    if (!open.length && met(team)){
-      const k = team.slice().sort().join("|");
-      if (!sols.has(k)){ sols.set(k, team.slice()); best = Math.min(best, team.length); }
+    const ds = deficit(team, xs), open = ds.filter(x => x.d > 0);
+    if (!open.length && met(team, xs)){
+      const iso = xs.length ? isoAssign(team, xs) : [];
+      if (!iso) return;
+      const k = team.slice().sort().join("|") + "#" + xs.slice().sort().join(",");
+      if (!sols.has(k)){ sols.set(k, {team:team.slice(), iso}); best = Math.min(best, team.length); }
       return;
     }
-    const lb = Math.max(1, ...open.map(x => x.d));
+    const remK = K - xs.length;
+    const lb = Math.max(0, ...open.map(x => x.d - (isoSet.has(BI[x.g.b]) ? remK : 0)));
     if (team.length + lb > Math.min(cap, best + 1)) return;
+    // 先试变形（不占人），每个盟约的变形按顺序加，避免重复排列
+    if (remK > 0) for (const x of open){ const i = BI[x.g.b];
+      if (!isoSet.has(i) || (xs.length && xs[xs.length - 1] > i)) continue;
+      xs.push(i); dfs(team); xs.pop(); if (nodes > NODE_MAX) return; }
     // 选候选最少的未达成盟约来分支
     let pick = null, cands = null;
     open.forEach(x => { const cs = pool.filter(n => !team.includes(n) && OPS[n].bonds.includes(x.g.b));
@@ -1505,21 +1618,21 @@ function goalSearch(M){
     cands.sort((a,b) => cover(b) - cover(a) || V[b] - V[a]);
     for (const n of cands.slice(0, 10)){ team.push(n); dfs(team); team.pop(); if (nodes > NODE_MAX) return; }
   })(locked.slice());
-  const list = [...sols.values()].map(t => ({team:t, size:t.length, val:t.reduce((a,n) => a + V[n], 0)}))
-    .sort((a,b) => a.size - b.size || b.val - a.val).slice(0, 6);
+  const list = [...sols.values()].map(({team:t, iso}) => ({team:t, iso, size:t.length, val:t.reduce((a,n) => a + V[n], 0)}))
+    .sort((a,b) => a.size - b.size || a.iso.length - b.iso.length || b.val - a.val).slice(0, 6);
   // 剩下的位置：按综合打分补位建议（不改动方案里的人）
-  list.forEach(x => { const f = bestTeam(-1, pool, cap, {fixed:x.team, swap:false}); x.fill = f.team.slice(x.team.length); });
+  list.forEach(x => { const f = bestTeam(-1, pool, cap, {fixed:x.team, swap:false}); x.fill = f.team.slice(x.team.length); x.isoMap = {}; x.iso.forEach(o => x.isoMap[o.n] = o.eq); });
   return {goals, list, locked, nodes, truncated: nodes > NODE_MAX};
 }
 
 // 用真实盟约效果算一遍：全队 DPS（对波次平均敌人）+ 首领击杀时间
-function planEval(team, withBoss = true){
+function planEval(team, withBoss = true, isoMap = {}){
   const en = waveEnemy(), B = planBoss();
   const calc0 = S.calc, boss0 = S.boss, d9 = S.deploy9, st0 = S.strat;
   try {
     S.strat = PLAN.strat || "";
     S.calc = {...S.calc, def:en.def, res:en.res}; S.deploy9 = team.length > 8;
-    return withTemp(() => { S.field = Array(9).fill(null); team.forEach((n,i) => S.field[i] = {name:n, elite:false, equips:[]}); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
+    return withTemp(() => { S.field = unitsOf(team, isoMap); S.bench = Array(BENCH_SIZE).fill(null); S.layers = {}; }, st => {
       const r = {dps:teamAvg(st), res:st.res, kill:null};
       if (B && withBoss){ S.boss = {...DEFAULT_BOSS, opts:{}, name:B.name, mode:PLAN.mode}; const R = bossSim(st, 1, 600); r.kill = R ? R.kill : null; }
       return r;
@@ -1544,8 +1657,76 @@ function waveChecks(team, F){
 
 let planCache = {key:"", html:""}, planTimer = null;
 const planKey = () => JSON.stringify([PLAN, S.calc.x, S.calc.trust, S.calc.def, S.calc.res, Object.keys(savedAll()), PLAN.gLock ? [S.field.slice(0, fieldCap()).map(u => u && u.name), S.deploy9] : 0]);
+// 阵容本局能不能用：被禁的人 / 要策略才有的人
+function lineupCheck(L){
+  const N = L.alts ? L : normalize(L);
+  const units = unitsAll(N).filter(u => OPS[u.name]);
+  const bad = [...new Set(units.filter(u => opBanned(u.name)).map(u => u.name))];
+  const need = [...new Set(units.filter(u => !opBanned(u.name) && STRAT_ONLY[u.name] && STRAT_ONLY[u.name] !== PLAN.strat && STRAT_ONLY[u.name] !== N.strat).map(u => u.name))];
+  return {bad, need, n:new Set(units.map(u => u.name)).size};
+}
+// 修补：拿不到的人先换成可用的备选，再按原阵容的盟约档位补人；其他人和位置、装备不动
+function repairLineup(L0){
+  const M = planModel(), {avail, levels, bestTeam, coreIdx} = M, A = new Set(avail);
+  const L = normalize(JSON.parse(JSON.stringify(L0)));
+  const ok = n => OPS[n] && (OPS[n].wild ? !opBanned(n) : A.has(n) || (STRAT_ONLY[n] && STRAT_ONLY[n] === L.strat && !opBanned(n)));
+  const cap = L.deploy9 ? 9 : 8, changes = [], lost = [];
+  boardsOf(L).forEach(({st, B}) => {
+    B.bench.forEach((u,i) => { if (u && !ok(u.name)){ const c = (u.cand || []).find(ok);
+      changes.push({st, out:u.name, in:c || null, bench:true}); B.bench[i] = c ? {name:c, elite:false, equips:u.equips.slice(0, 2)} : null; } });
+    const slots = B.field.slice(0, cap), real = u => u && !OPS[u.name].wild;
+    const badIdx = slots.map((u,i) => u && !ok(u.name) ? i : -1).filter(i => i >= 0);
+    if (!badIdx.length) return;
+    const goal = levels(slots.filter(real).map(u => u.name));
+    const keep = slots.filter((u,i) => real(u) && !badIdx.includes(i)).map(u => u.name);
+    const repl = {};
+    badIdx.forEach(i => { const c = (slots[i].cand || []).find(n => ok(n) && !OPS[n].wild && !keep.includes(n) && !Object.values(repl).includes(n)); if (c) repl[i] = c; });
+    const fixed = keep.concat(Object.values(repl));
+    const rest = badIdx.filter(i => repl[i] === undefined && real(slots[i]));
+    if (rest.length){
+      const pen = t => { const Lv = levels(t); let p = 0; goal.forEach((g, i) => { if (g > Lv[i]) p += (coreIdx.has(i) ? 14 : 7) * (g - Lv[i]); }); return -p; };
+      const r = bestTeam(-1, avail.filter(n => !fixed.includes(n)), fixed.length + rest.length, {fixed, extra:pen});
+      r.team.slice(fixed.length).forEach((n, k) => repl[rest[k]] = n);
+    }
+    badIdx.forEach(i => { const u = slots[i], n = repl[i];
+      changes.push({st, out:u.name, in:n || null, cand:!!(n && (u.cand || []).includes(n))});
+      B.field[i] = n ? {name:n, elite:false, equips:u.equips.slice(0, slotCount(n, false)), ...((u.cand || []).filter(x => x !== n).length ? {cand:(u.cand || []).filter(x => x !== n)} : {})} : null; });
+    const now = levels(B.field.slice(0, cap).filter(real).map(u => u.name));
+    goal.forEach((g, i) => { if (now[i] < g) lost.push(`${st}·${D.bonds[i].name} ${TIERS[g-1]}→${now[i] ? TIERS[now[i]-1] : "未激活"}`); });
+  });
+  L.name = (L0.name || "阵容") + "（修补）";
+  return {L, changes, lost};
+}
+function repairSummary(R){
+  if (!R.changes.length) return "这个阵容本局不用修补。";
+  const by = {}; R.changes.forEach(c => (by[c.st] = by[c.st] || []).push(`${c.out} → ${c.in || "（空出）"}${c.cand ? "（备选）" : ""}${c.bench ? "（整备区）" : ""}`));
+  return Object.entries(by).map(([st, a]) => `${st}：${a.join("，")}`).join("\n") + (R.lost.length ? `\n没能保住：${R.lost.join("、")}` : "\n原来的盟约档位都保住了");
+}
+function repairAndLoad(L, label){
+  const R = repairLineup(L);
+  if (!R.changes.length) return toast("本局都能拿到，不用修补");
+  if (!confirm(`修补「${label}」：\n${repairSummary(R)}\n\n载入修补后的阵容？（作为当前阵容，原阵容不变，需要的话再保存）`)) return;
+  S = R.L; selected = null; refreshSaved(); render(); closeLib(); if (isPhone()) setView("board"); toast("已载入修补后的阵容");
+}
+let repOpen = null;
+function renderPlanMine(){
+  const all = savedAll(), rows = [];
+  if (unitsAll(S).length) rows.push({k:"__cur", label:`当前阵容${S.name ? "（" + S.name + "）" : ""}`, L:S});
+  Object.keys(all).forEach(k => rows.push({k, label:k, L:all[k]}));
+  if (!rows.length){ $("planMine").innerHTML = ""; return; }
+  const chk = rows.map(r => ({...r, ...lineupCheck(r.L)})).sort((a,b) => (a.k === "__cur" ? -1 : b.k === "__cur" ? 1 : 0) || a.bad.length - b.bad.length || a.need.length - b.need.length);
+  $("planMine").innerHTML = `<h3 class="psh">我的阵容本局可用吗 <small>拿不到的人可以一键修补：先用备选，再按原来的盟约档位补人</small></h3>` + chk.map(c => { const badN = c.bad.length + c.need.length;
+    let rep = "";
+    if (repOpen === c.k && badN){ const R = repairLineup(c.L);
+      rep = `<div class="rep">${R.changes.map(x => `<div><span class="stl">${x.st}${x.bench ? "·整备区" : ""}</span> <s>${esc(x.out)}</s> → <b>${x.in ? esc(x.in) : "（空出）"}</b>${x.cand ? ' <span class="muted">备选</span>' : ""}</div>`).join("")}
+        ${R.lost.length ? `<div class="warn">没能保住：${R.lost.map(esc).join("、")}</div>` : `<div class="okt">原来的盟约档位都保住了</div>`}
+        <button type="button" class="primary" data-preplo="${esc(c.k)}">载入修补后的阵容</button></div>`; }
+    return `<div class="pl ${badN ? "bad" : "ok"}"><span>${badN ? "✗" : "✓"}</span><b>${esc(c.label)}</b><span class="muted">${c.bad.length ? `被禁 ${c.bad.length} 人：${c.bad.map(esc).join("、")}` : `${c.n} 人都能用`}${c.need.length ? `<span class="warn">；${c.need.map(n => `${esc(n)} 要先拿策略「${esc(STRAT_ONLY[n])}」`).join("、")}</span>` : ""}</span><span style="flex:1"></span>
+      ${badN ? `<button data-prep="${esc(c.k)}">${repOpen === c.k ? "收起" : "修补"}</button>` : ""}${c.k !== "__cur" ? `<button data-plib="${esc(c.k)}">载入</button>` : ""}</div>${rep}`; }).join("");
+}
 function renderPlan(){
   if ($("tab-plan").hidden) return;
+  renderPlanMine();
   if (planKey() === planCache.key) return;
   clearTimeout(planTimer);
   $("planOut").style.opacity = ".55";
@@ -1569,6 +1750,8 @@ function renderPlanInputs(){
     <div class="pbs">${WAVE_TAGS.map(t => `<button type="button" class="pb" data-pwave="${t}" title="${esc(WAVE_INFO[t]?.d||"")}">+ ${t}</button>`).join("")}</div>
     <div class="pws">${PLAN.waves.length ? PLAN.waves.map((t,i) => `<span>第${i+1}波 <b>${t}</b><button type="button" data-pwdel="${i}" title="移除">×</button></span>`).join("") : `<span class="muted" style="border:0;background:none">还没有添加波次</span>`}</div>
     <div class="pgr"><label>过渡阵容阶级<select data-pk="tTier">${tierOpts(PLAN.tTier)}</select></label><label>过渡阵容人数<select data-pk="tN">${[3,4,5,6,7,8].map(n => `<option${n===+PLAN.tN?" selected":""}>${n}</option>`).join("")}</select></label></div>
+    <div class="pgr"><label>变形同构体（终局 / 目标盟约）<select data-pk="iso">${[0,1,2,3].map(n => `<option value="${n}"${n===+PLAN.iso?" selected":""}>${n ? `最多 ${n} 个` : "不用"}</option>`).join("")}</select></label>
+      <small class="muted" style="align-self:end">每个 = 同构体 + 对应装备，让一名干员多一个盟约；被禁的盟约不能变${PLAN.strat === "变形同构" ? "；已选策略「变形同构」" : ""}</small></div>
     <div style="margin-top:8px;display:flex;gap:6px"><button type="button" data-preset="1">清空本局信息</button></div>
     <div class="ph" style="margin-top:16px">按目标盟约找阵容 <small>点盟约切换要求的档位，找出最少需要哪些人</small></div>
     <div class="pbs">${CORE.concat(SUBS).filter(b => b !== "绝技" && !bondBanned(b)).map(goalChip).join("")}</div>
@@ -1576,6 +1759,7 @@ function renderPlanInputs(){
       <label class="ck"><span><input type="checkbox" data-pk="gLock" ${PLAN.gLock?"checked":""}> 保留当前战场干员</span><small class="muted">在已有阵容上补齐目标</small></label></div>
     ${Object.values(PLAN.goals||{}).some(Boolean) ? `<div style="margin-top:6px"><button type="button" data-pgclear="1">清空目标</button></div>` : ""}`;
 }
+const isoLine = list => list && list.length ? `<div class="sub isol">变形同构体：${list.map(o => `<b>${esc(o.n)}</b> 带「${esc(o.eq)}」→【${esc(o.b)}】`).join("；")}</div>` : "";
 const teamRow = (team, mark = new Set(), dim = []) => `<div class="lf">${team.map(n => `<div class="lm ${mark.has(n)?"lk":""}" style="--tc:${TC[OPS[n].tier]}" title="${esc(n)}${mark.has(n)?"（已在场）":""}"><img src="${avatar(n)}" alt=""><div>${esc(n)}</div></div>`).join("")}${dim.map(n => `<div class="lm fill" style="--tc:${TC[OPS[n].tier]}" title="补位建议：${esc(n)}"><img src="${avatar(n)}" alt=""><div>${esc(n)}</div></div>`).join("")}</div>`;
 const bondsRow = res => { const act = Object.values(res).filter(r => r.level > 0 && !bondBanned(r.name)).sort((a,b) => (CORE.includes(b.name) - CORE.includes(a.name)) || b.level - a.level);
   return `<div class="cb">${act.map(r => `<span class="on ${CORE.includes(r.name)?"core":""}">${esc(r.name)}<b>${r.total}${r.level >= THRESH[r.name].length ? "·满" : `→${THRESH[r.name][r.level]}`}</b></span>`).join("") || '<span class="lbl">没有激活的盟约</span>'}</div>`; };
@@ -1593,19 +1777,20 @@ function buildPlan(){
     if (!G.list.length) html += `<div class="muted">在 ${fieldCap()} 人以内凑不出这些目标${G.truncated ? "（搜索量太大，已提前停止）" : ""}。试着降低档位、放宽阶级，或少选几个目标。</div>`;
     const lockSet = new Set(G.locked);
     G.list.forEach((x, i) => {
-      const ev = planEval(x.team, false);
+      const ev = planEval(x.team, false, x.isoMap);
       goalRows.push(x);
       const add = x.team.filter(n => !lockSet.has(n));
       html += `<div class="libc pc">
         <div class="lh"><b>方案 ${i+1}</b><span class="muted" style="font-size:12px">${G.locked.length ? `再买 ${add.length} 人` : `${x.size} 人`} · 空 ${fieldCap() - x.size} 个位置 · DPS ${f0(ev.dps)}</span><span style="flex:1"></span><button class="primary" data-pgload="${i}">放上战场</button></div>
         ${teamRow(x.team, lockSet, x.fill)}
+        ${isoLine(x.iso)}
         ${bondsRow(ev.res)}
         ${x.fill.length ? `<div class="sub">虚线框是补位建议（不在方案里，按综合打分挑的）</div>` : ""}
       </div>`;
     });
   }
   // ---- 每个核心盟约：过渡 + 终局 ----
-  const rows = list.filter(x => x.team).map(x => ({...x, ev:planEval(x.team), tev:x.trans ? planEval(x.trans, false) : null}));
+  const rows = list.filter(x => x.team).map(x => { const isoMap = {}; (x.isoList || []).forEach(o => isoMap[o.n] = o.eq); return {...x, isoMap, ev:planEval(x.team, true, isoMap), tev:x.trans ? planEval(x.trans, false) : null}; });
   const maxD = Math.max(1, ...rows.map(x => x.ev.dps)), kills = rows.map(x => x.ev.kill).filter(k => k != null), bestK = kills.length ? Math.min(...kills) : 0;
   const SB = STRAT[PLAN.strat] && STRAT[PLAN.strat].bond;
   rows.forEach(x => x.rank = x.score + 6 * x.ev.dps / maxD + (B && x.ev.kill != null ? 6 * bestK / x.ev.kill : 0) + (SB === x.core ? 8 : 0));
@@ -1621,6 +1806,7 @@ function buildPlan(){
         : `<div class="stl">过渡 <span class="muted">≤ ${TIERS[(+PLAN.tTier||3)-1]} 阶的【${esc(x.core)}】干员不足 ${THRESH[x.core][0]} 人，凑不出过渡阵容</span></div>`}
       <div class="stl">终局 <span class="muted">DPS ${f0(x.ev.dps)}${kill ? " · " + kill : ""}</span></div>
       ${teamRow(x.team)}
+      ${isoLine(x.isoList)}
       ${bondsRow(x.ev.res)}
       ${PLAN.waves.length ? `<div class="pchk">${waveChecks(x.team, F)}</div>` : ""}
       ${spare.length ? `<div class="sub">其他可用【${esc(x.core)}】干员：${spare.map(esc).join("、")}</div>` : ""}
@@ -1636,26 +1822,17 @@ function buildPlan(){
       const idx = PLAN.waves.map((x,i) => x === t ? i + 1 : 0).filter(Boolean);
       return `<div class="pw"><b>${t}</b><span class="muted">第 ${idx.join("、")} 波 · 平均生命 ${f0(a.hp)} · 防御 ${f0(a.def)} · 法抗 ${f0(a.res)}</span><div>${esc(I.d||"")}。${esc(I.tip||"")}。</div></div>`; }).join("");
   }
-  // 我保存的阵容本局能不能用（两个阶段都算）
-  const all = savedAll(), ks = Object.keys(all);
-  if (ks.length){
-    const chk = ks.map(k => { const L = all[k], A = L.alt || {};
-      const units = [...(L.field||[]), ...(L.bench||[]), ...(A.field||[]), ...(A.bench||[])].filter(u => u && OPS[u.name]);
-      const bad = [...new Set(units.filter(u => opBanned(u.name)).map(u => u.name))];
-      const need = [...new Set(units.filter(u => STRAT_ONLY[u.name] && STRAT_ONLY[u.name] !== PLAN.strat).map(u => u.name))];
-      return {k, bad, need, n:new Set(units.map(u => u.name)).size}; }).sort((a,b) => a.bad.length - b.bad.length || a.need.length - b.need.length);
-    html += `<h3 class="psh">我的阵容本局可用吗</h3>` + chk.map(c => `<div class="pl ${c.bad.length?"bad":"ok"}"><span>${c.bad.length ? "✗" : "✓"}</span><b>${esc(c.k)}</b><span class="muted">${c.bad.length ? `被禁 ${c.bad.length} 人：${c.bad.map(esc).join("、")}` : `${c.n} 人都能用`}${c.need.length ? `<span class="warn">；${c.need.map(n => `${esc(n)} 要先拿策略「${esc(STRAT_ONLY[n])}」`).join("、")}</span>` : ""}</span><span style="flex:1"></span><button data-plib="${esc(c.k)}">载入</button></div>`).join("");
-  }
   planCache = {key, html};
   $("planOut").innerHTML = html;
 }
-const unitsOf = team => { const f = Array(9).fill(null); team.forEach((n,i) => f[i] = {name:n, elite:false, equips:[]}); return f; };
+const unitsOf = (team, isoMap = {}) => { const f = Array(9).fill(null); team.forEach((n,i) => f[i] = {name:n, elite:false, equips:isoMap[n] ? [ISO, isoMap[n]] : []}); return f; };
 function loadPlanTeam(r){
-  if ([...S.field, ...S.bench, ...S.alt.field, ...S.alt.bench].some(Boolean) && !confirm("用这套推荐替换当前阵容（过渡和终局两个阶段）？没保存的改动会丢失。")) return;
+  if (unitsAll(S).length && !confirm("用这套推荐替换当前阵容（所有阶段）？没保存的改动会丢失。")) return;
   const L = emptyLineup();
   L.name = `${r.core}（推荐）`; L.strat = PLAN.strat || "";
-  if (r.trans){ L.stage = "过渡"; L.field = unitsOf(r.trans); L.alt.field = unitsOf(r.team); }
-  else { L.stage = "终局"; L.field = unitsOf(r.team); }
+  const fin = unitsOf(r.team, r.isoMap);
+  if (r.trans){ L.stage = "过渡"; L.field = unitsOf(r.trans); L.alts = {前期:blankBoard(), 终局:{field:fin, bench:Array(BENCH_SIZE).fill(null)}}; }
+  else { L.stage = "终局"; L.field = fin; }
   if (PLAN.boss){ L.boss.name = PLAN.boss; L.boss.mode = PLAN.mode; }
   S = L; selected = null; refreshSaved(); render(); if (isPhone()) setView("board"); toast(r.trans ? "已载入，当前显示过渡阵容" : "已载入终局阵容");
 }
@@ -1665,35 +1842,40 @@ function loadGoalTeam(x){
   if (!keep && cur.length && !confirm(`用方案替换当前${S.stage}阶段的战场？`)) return;
   const old = {}; cur.forEach(u => old[u.name] = u);
   const f = Array(9).fill(null);
-  x.team.forEach((n,i) => f[i] = old[n] || {name:n, elite:false, equips:[]});
+  let noRoom = [];
+  x.team.forEach((n,i) => { const eq = (x.isoMap || {})[n]; let u = old[n] || {name:n, elite:false, equips:[]};
+    if (eq && !u.equips.includes(ISO)){ if (slotCount(n, u.elite) - u.equips.length >= 2) u = {...u, equips:[...u.equips, ISO, eq]}; else noRoom.push(n); }
+    f[i] = u; });
   if (keep){ let j = x.team.length; cur.forEach(u => { if (!x.team.includes(u.name) && j < cap) f[j++] = u; }); }
-  S.field = f; selected = null; render(); if (isPhone()) setView("board"); toast(`方案已放上${S.stage}阶段的战场`);
+  S.field = f; selected = null; render(); if (isPhone()) setView("board"); toast(noRoom.length ? `已放上战场；${noRoom.join("、")} 装备栏不够，变形装备没加上` : `方案已放上${S.stage}阶段的战场`);
 }
 $("tab-plan").addEventListener("click", e => {
   const t = e.target;
   const pb = t.closest("[data-pban]");
   if (pb){ const [kind, b] = pb.dataset.pban.split(":"); const a = PLAN[kind];
     if (a.includes(b)) a.splice(a.indexOf(b), 1); else { if (a.length >= 5) return toast("每局最多禁 5 个"); a.push(b); }
-    savePlan(); renderPlan(); return; }
+    savePlan(); renderPlan(); renderPool(); renderShop(); return; }
   const pg = t.closest("[data-pgoal]");
   if (pg){ const b = pg.dataset.pgoal, n = THRESH[b].length; PLAN.goals = {...(PLAN.goals||{})}; PLAN.goals[b] = ((PLAN.goals[b]||0) + 1) % (n + 1); if (!PLAN.goals[b]) delete PLAN.goals[b]; savePlan(); renderPlan(); return; }
   if (t.closest("[data-pgclear]")){ PLAN.goals = {}; savePlan(); renderPlan(); return; }
   const pw = t.closest("[data-pwave]"); if (pw){ PLAN.waves.push(pw.dataset.pwave); savePlan(); renderPlan(); return; }
   const pd = t.closest("[data-pwdel]"); if (pd){ PLAN.waves.splice(+pd.dataset.pwdel, 1); savePlan(); renderPlan(); return; }
-  if (t.closest("[data-preset]")){ if (!confirm("清空禁用盟约、首领和波次？（目标盟约和过渡设置保留）")) return; PLAN = {...PLAN, banCore:[], banSub:[], waves:[], boss:""}; savePlan(); renderPlan(); return; }
+  if (t.closest("[data-preset]")){ if (!confirm("清空禁用盟约、首领、波次和购买清单的勾选？（目标盟约和过渡设置保留）")) return; PLAN = {...PLAN, banCore:[], banSub:[], waves:[], boss:""}; savePlan(); GOT.clear(); saveGot(); renderPlan(); renderPool(); renderShop(); return; }
   const pl = t.closest("[data-pload]"); if (pl){ const r = planRows[+pl.dataset.pload]; if (r) loadPlanTeam(r); return; }
   const gl = t.closest("[data-pgload]"); if (gl){ const x = goalRows[+gl.dataset.pgload]; if (x) loadGoalTeam(x); return; }
+  const rp = t.closest("[data-prep]"); if (rp){ repOpen = repOpen === rp.dataset.prep ? null : rp.dataset.prep; renderPlanMine(); return; }
+  const rl = t.closest("[data-preplo]"); if (rl){ const k = rl.dataset.preplo, R = repairLineup(k === "__cur" ? S : savedAll()[k]); S = R.L; repOpen = null; selected = null; refreshSaved(); render(); if (isPhone()) setView("board"); toast("已载入修补后的阵容，记得保存"); return; }
   const lb = t.closest("[data-plib]"); if (lb){ const k = lb.dataset.plib; S = normalize(savedAll()[k]); selected = null; refreshSaved(k); render(); if (isPhone()) setView("board"); toast("已载入：" + k); }
 });
 $("tab-plan").addEventListener("change", e => {
   const s = e.target.closest("[data-pk]"); if (!s) return;
-  PLAN[s.dataset.pk] = s.type === "checkbox" ? s.checked : s.value; savePlan(); renderPlan();
+  PLAN[s.dataset.pk] = s.type === "checkbox" ? s.checked : s.value; savePlan(); renderPlan(); if (s.dataset.pk === "strat"){ renderPool(); renderShop(); }
 });
 
 function render(){
   const state = compute();
   lastState = state;
-  renderStrat(); renderBoard(state); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); renderPlan(); markUsed(); renderDetail();
+  renderStrat(); renderBoard(state); renderShop(); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); renderPlan(); markUsed(); renderDetail();
   $("deploy9").checked = S.deploy9;
   $("lineupName").value = S.name;
   autosave();
@@ -1737,8 +1919,14 @@ $("mnav").addEventListener("click", e => { const b = e.target.closest("[data-vie
 $("poolGrid").addEventListener("click", e => { const t = e.target.closest(".tile"); if (!t) return; placeNew(t.dataset.op); if (isPhone()) toast(`已加入：${t.dataset.op}`); });
 $("poolGrid").addEventListener("dragstart", e => { const t = e.target.closest(".tile"); if (t) e.dataTransfer.setData("text/plain", JSON.stringify({op:t.dataset.op})); });
 $("q").addEventListener("input", renderPool);
-$("bondFilter").addEventListener("change", renderPool);
+["bondFilter","bondFilter2","fType","fTime","fRun","fHide"].forEach(id => $(id).addEventListener("change", renderPool));
 $("bondFilter").innerHTML += D.bonds.map(b=>`<option>${esc(b.name)}</option>`).join("");
+$("bondFilter2").innerHTML += D.bonds.map(b=>`<option>${esc(b.name)}</option>`).join("");
+{ const cnt = (f) => { const c = {}; D.operators.forEach(o => f(o).forEach(k => c[k] = (c[k] || 0) + 1)); return Object.entries(c).sort((a,b) => b[1] - a[1]); };
+  $("fType").innerHTML += cnt(o => o.trait_type ? [o.trait_type] : []).map(([k,n]) => `<option value="${esc(k)}">${esc(k)}（${n}）</option>`).join("");
+  $("fTime").innerHTML += cnt(o => [...new Set(((o.trait || "") + (o.trait_elite || "")).match(/<[^<>]+(?:时|中)>/g) || [])]).map(([k,n]) => `<option value="${esc(k)}">${esc(k.slice(1, -1))}（${n}）</option>`).join(""); }
+$("advBtn").addEventListener("click", () => { $("adv").hidden = !$("adv").hidden; renderPool(); });
+$("fReset").addEventListener("click", () => { ["q","bondFilter","bondFilter2","fType","fTime"].forEach(id => $(id).value = ""); $("fRun").checked = $("fHide").checked = false; tierOn.clear(); document.querySelectorAll("#tierbar button").forEach(b => b.classList.remove("on")); renderPool(); });
 $("tierbar").innerHTML = TIERS.map(t=>`<button data-t="${t}" style="border-bottom:2px solid ${TC[t]}">${t}</button>`).join("");
 $("tierbar").addEventListener("click", e => { const b = e.target.closest("button"); if(!b) return; const t=b.dataset.t; tierOn.has(t)?tierOn.delete(t):tierOn.add(t); b.classList.toggle("on"); renderPool(); });
 
@@ -1779,10 +1967,44 @@ $("tierbar").addEventListener("click", e => { const b = e.target.closest("button
   });
 });
 
+// ===== 购买清单：当前阵容各阶段要买的人，点一下记为已拿到（本机记录，换局时清空）=====
+let GOT = new Set(store.get("wsxy-got", [])), shopOpen = store.get("wsxy-shop", true);
+const saveGot = () => store.set("wsxy-got", [...GOT]);
+const runOK = n => !opBanned(n) && (!STRAT_ONLY[n] || STRAT_ONLY[n] === S.strat || STRAT_ONLY[n] === PLAN.strat);
+function renderShop(){
+  const cap = fieldCap(), seen = new Set(), groups = [];
+  boardsOf(S).forEach(({st, B}) => {
+    const us = [...B.field.slice(0, cap), ...B.bench].filter(u => u && !seen.has(u.name) && seen.add(u.name))
+      .sort((a,b) => TIERS.indexOf(OPS[a.name].tier) - TIERS.indexOf(OPS[b.name].tier));
+    if (us.length) groups.push({st, us});
+  });
+  const all = groups.flatMap(g => g.us), got = all.filter(u => GOT.has(u.name)).length;
+  const bad = all.filter(u => !runOK(u.name));
+  const head = `<div class="zone-h shoph" data-shop="toggle"><b>购买清单</b><span class="muted">已拿 ${got}/${all.length}</span><span class="pbar"><i style="width:${all.length ? 100 * got / all.length : 0}%"></i></span><span style="flex:1"></span>${bad.length ? `<span class="warn">${bad.length} 人本局拿不到</span>` : ""}<span class="muted">${shopOpen ? "▴" : "▾"}</span></div>`;
+  if (!all.length){ $("shopBox").innerHTML = head + (shopOpen ? '<div class="muted" style="font-size:12px">阵容里还没有干员。</div>' : ""); return; }
+  if (!shopOpen){ $("shopBox").innerHTML = head; return; }
+  const item = u => { const n = u.name, o = OPS[n], g = GOT.has(n), ok = runOK(n);
+    const alt = !ok ? (u.cand || []).find(c => runOK(c)) : null;
+    const why = opBanned(n) ? "本局被禁" : "需策略「" + STRAT_ONLY[n] + "」";
+    return `<button type="button" class="shi ${g ? "got" : ""} ${ok ? "" : "ban"}" data-got="${esc(n)}" style="--tc:${TC[o.tier]}" title="${g ? "点一下取消" : "点一下记为已拿到"}">
+      <img src="${avatar(n)}" alt=""><span class="nm">${esc(n)}</span><span class="t">${o.wild ? "任意" : o.tier}</span>
+      ${g ? '<i class="ok">✓</i>' : ""}${!ok ? `<i class="bad">${why}${alt ? "，备选 " + esc(alt) : ""}</i>` : u.cand && u.cand.length ? `<small>备：${u.cand.map(esc).join("、")}</small>` : ""}</button>`; };
+  $("shopBox").innerHTML = head + groups.map(g => `${groups.length > 1 ? `<div class="stl">${g.st}</div>` : ""}<div class="shl">${g.us.map(item).join("")}</div>`).join("")
+    + `<div class="shf">${bad.length ? `<button type="button" class="primary" data-shop="repair">修补阵容（换掉拿不到的 ${bad.length} 人）</button>` : ""}<button type="button" data-shop="clear">清空勾选</button><span class="muted">只记在这台设备上，按干员名记，换阵容也保留</span></div>`;
+}
+$("shopBox").addEventListener("click", e => {
+  const g = e.target.closest("[data-got]");
+  if (g){ const n = g.dataset.got; GOT.has(n) ? GOT.delete(n) : GOT.add(n); saveGot(); renderShop(); return; }
+  const a = e.target.closest("[data-shop]"); if (!a) return;
+  const k = a.dataset.shop;
+  if (k === "toggle"){ shopOpen = !shopOpen; store.set("wsxy-shop", shopOpen); renderShop(); }
+  else if (k === "clear"){ if (GOT.size && !confirm("清空所有“已拿到”标记？")) return; GOT.clear(); saveGot(); renderShop(); }
+  else if (k === "repair") repairAndLoad(S, "当前阵容");
+});
 function renderStrat(){
   const sel = $("stratSel");
   if (!sel.options.length || sel.value !== S.strat) sel.innerHTML = stratOptions(S.strat);
-  const only = [...S.field, ...S.bench, ...S.alt.field, ...S.alt.bench].filter(u => u && STRAT_ONLY[u.name] && STRAT_ONLY[u.name] !== S.strat).map(u => u.name);
+  const only = unitsAll(S).filter(u => STRAT_ONLY[u.name] && STRAT_ONLY[u.name] !== S.strat).map(u => u.name);
   $("stratEff").innerHTML = S.strat ? stratEffHTML(S.strat) : "战斗类策略会计入盟约和伤害计算；盟约类策略在对局规划里优先对应的核心盟约。";
   $("stratWarn").hidden = !only.length;
   $("stratWarn").textContent = only.length ? `⚠ ${[...new Set(only)].map(n => `${n} 商店买不到，要选策略「${STRAT_ONLY[n]}」`).join("；")}` : "";
@@ -1790,11 +2012,18 @@ function renderStrat(){
 $("stratSel").addEventListener("change", e => { S.strat = e.target.value; render(); });
 $("stratEff").addEventListener("click", () => $("stratEff").classList.toggle("open"));
 function switchStage(st){
-  if (st === S.stage) return;
-  const a = S.alt; S.alt = {field:S.field, bench:S.bench}; S.field = a.field; S.bench = a.bench; S.stage = st;
+  if (st === S.stage || !STAGES.includes(st)) return;
+  const a = S.alts[st]; delete S.alts[st]; S.alts[S.stage] = {field:S.field, bench:S.bench}; S.field = a.field; S.bench = a.bench; S.stage = st;
   selected = null; render(); toast(`切换到${st}阵容`);
 }
 $("stSeg").addEventListener("click", e => { const b = e.target.closest("[data-st]"); if (b) switchStage(b.dataset.st); });
+$("stCopy").addEventListener("change", e => {
+  const st = e.target.value; e.target.value = ""; if (!st) return;
+  const T = S.alts[st];
+  if ([...T.field, ...T.bench].some(Boolean) && !confirm(`${st}阶段已经有干员，用${S.stage}阶段的覆盖？`)) return;
+  S.alts[st] = JSON.parse(JSON.stringify({field:S.field, bench:S.bench}));
+  render(); toast(`已把${S.stage}阶段复制到${st}`);
+});
 $("bvSeg").addEventListener("click", e => {
   const b = e.target.closest("[data-bv]"); if (!b) return;
   compactBoard = b.dataset.bv === "1"; store.set("wsxy-compact", compactBoard); render();
@@ -1897,6 +2126,7 @@ $("dpsTable").addEventListener("click", e => {
 $("detail").addEventListener("change", e => {
   const u = selected && S[selected.zone][selected.idx]; if (!u) return;
   const t = e.target;
+  if (t.dataset.cadd){ if (!t.value) return; u.cand = [...(u.cand || []), t.value].slice(0, 4); render(); return; }
   if (t.dataset.u === "skill"){ u.skill = +t.value; delete u.skp; }
   else if (t.dataset.u === "mod"){ u.mod = +t.value; }
   else if (t.dataset.cond){ u.conds = u.conds || {}; const def = t.dataset.def === "1"; if (t.checked === def) delete u.conds[t.dataset.cond]; else u.conds[t.dataset.cond] = t.checked; }
@@ -1908,6 +2138,13 @@ $("detail").addEventListener("change", e => {
 $("detail").addEventListener("click", e => {
   const f = e.target.closest("[data-fill]");
   if (f && selected){ placeNew(f.dataset.fill, selected.zone, selected.idx); toast(`已替换为：${f.dataset.fill}`); return; }
+  const cu = selected && S[selected.zone][selected.idx];
+  const cw = e.target.closest("[data-cswap]");
+  if (cw && cu){ const n = cw.dataset.cswap;
+    S[selected.zone][selected.idx] = {name:n, elite:cu.elite, equips:cu.equips.slice(0, slotCount(n, cu.elite)), cand:[cu.name, ...(cu.cand || []).filter(x => x !== n)]};
+    render(); toast(`已换上：${n}（${cu.name} 留作备选）`); return; }
+  const cd = e.target.closest("[data-cdel]");
+  if (cd && cu){ cu.cand = (cu.cand || []).filter(x => x !== cd.dataset.cdel); if (!cu.cand.length) delete cu.cand; render(); return; }
   const b = e.target.closest("[data-act2]"); if (!b) return;
   const u = selected && S[selected.zone][selected.idx]; if (!u) return;
   if (b.dataset.act2 === "skpReset"){ delete u.skp; render(); }
@@ -1937,7 +2174,7 @@ function openEquip(pos, k){
 function renderEquip(){
   const q = $("mQ").value.trim();
   let html = "", last = 0;
-  D.equipment.filter(e => !q || e.name.includes(q) || (e.effect||"").includes(q)).forEach(e => {
+  D.equipment.filter(e => !q || pyMatch(e.name, q) || (e.effect||"").includes(q)).forEach(e => {
     if (e.tier !== last){ html += `<div class="muted" style="margin:8px 0 4px">${e.tier} 阶</div>`; last = e.tier; }
     const ib = isoBondOf(e.name);
     html += `<div class="eqitem" data-name="${esc(e.name)}"><span class="en">${esc(e.name)}</span><span class="muted"> · 售价 ${e.price}</span>
@@ -1987,13 +2224,12 @@ $("btnSave").addEventListener("click", () => {
   if (store.set("wsxy-lineups", all)) { refreshSaved(name); toast("已保存：" + name); } else toast("保存失败（浏览器禁止本地存储），请用“导出”");
 });
 // ===== 阵容库：所有保存的阵容（简洁版）=====
-function libCardHTML(k, L){
+function libCardHTML(k, L, info){
   const keep = S; const parts = [];
   let N;
   try {
     S = normalize(L); N = S;
-    const boards = {[N.stage]:{field:N.field, bench:N.bench}, [otherStage(N.stage)]:N.alt};
-    STAGES.forEach(st => { const B = boards[st]; if (![...B.field, ...B.bench].some(Boolean)) return; S.field = B.field; S.bench = B.bench; parts.push({st, B, state:compute()}); });
+    boardsOf(N).forEach(({st, B}) => { if (![...B.field, ...B.bench].some(Boolean)) return; S.field = B.field; S.bench = B.bench; parts.push({st, B, state:compute()}); });
   } finally { S = keep; }
   const cap = N.deploy9 ? 9 : 8;
   const lm = u => `<div class="lm" style="--tc:${TC[OPS[u.name].tier]}" title="${esc(u.name)}${u.elite?"（精锐）":""}"><img src="${avatar(u.name)}" alt="" loading="lazy"><div>${esc(u.name)}</div></div>`;
@@ -2004,18 +2240,40 @@ function libCardHTML(k, L){
     ${compactBondsHTML(state)}`; }).join("");
   const main = parts.find(p => p.st === N.stage) || parts[0];
   const fN = main ? main.B.field.slice(0, cap).filter(Boolean).length : 0;
+  const badN = info.bad.length + info.need.length;
   return `<div class="libc ${k===S.name?"cur":""}">
-    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">${two ? "过渡 + 终局" : `场上 ${fN}/${cap}`}${N.strat ? ` · 策略「${esc(N.strat)}」` : ""}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
-      <button class="primary" data-lload="${esc(k)}">载入</button><button data-ldel="${esc(k)}">删除</button></div>
+    <div class="lh"><b>${esc(k)}</b><span class="muted" style="font-size:12px">${two ? parts.map(p => p.st).join(" + ") : `场上 ${fN}/${cap}`}${N.strat ? ` · 策略「${esc(N.strat)}」` : ""}${k===S.name?" · 当前":""}</span><span style="flex:1"></span>
+      <button class="primary" data-lload="${esc(k)}">载入</button><button data-lshare="${esc(k)}" title="生成分享链接">分享</button><button data-ldel="${esc(k)}">删除</button></div>
+    ${badN ? `<div class="lst bad">本局拿不到：${[...info.bad, ...info.need].map(esc).join("、")} <button data-lrep="${esc(k)}">修补</button></div>` : (PLAN.banCore.length + PLAN.banSub.length ? '<div class="lst ok">本局都能拿到</div>' : "")}
     ${body || '<span class="muted" style="font-size:12px">空阵容</span>'}
   </div>`;
 }
+let libF = "all";
+// 阵容各阶段激活的盟约（筛选用）
+function lineupBonds(L){
+  const keep = S, out = new Set();
+  try { S = normalize(L); boardsOf(S).forEach(({B}) => { S.field = B.field; S.bench = B.bench; Object.values(compute().res).forEach(r => r.level > 0 && out.add(r.name)); }); } finally { S = keep; }
+  return out;
+}
 function renderLib(){
   const all = savedAll(), ks = Object.keys(all).sort((a,b) => a.localeCompare(b, "zh"));
-  $("libCount").textContent = ks.length ? `${ks.length} 个` : "";
-  $("libBody").innerHTML = ks.map(k => libCardHTML(k, all[k])).join("")
-    || `<div class="muted">还没有保存的阵容。在顶部${isPhone()?"「阵容管理 ▾」里":""}填名称后点「保存」。</div>`;
+  const q = $("libQ").value.trim(), bond = $("libBond").value;
+  document.querySelectorAll("#libSeg [data-lf]").forEach(b => b.classList.toggle("on", b.dataset.lf === libF));
+  const shown = ks.map(k => ({k, info:lineupCheck(all[k])})).filter(({k, info}) => {
+    const badN = info.bad.length + info.need.length;
+    if (libF === "ok" && badN) return false;
+    if (libF === "bad" && !badN) return false;
+    if (q && !pyMatch(k, q) && !unitsAll(normalize(all[k])).some(u => pyMatch(u.name, q))) return false;
+    if (bond && !lineupBonds(all[k]).has(bond)) return false;
+    return true; });
+  $("libCount").textContent = ks.length ? (shown.length < ks.length ? `${shown.length} / ${ks.length} 个` : `${ks.length} 个`) : "";
+  $("libBody").innerHTML = shown.map(({k, info}) => libCardHTML(k, all[k], info)).join("")
+    || (ks.length ? '<div class="muted">没有符合筛选的阵容。</div>' : `<div class="muted">还没有保存的阵容。在顶部${isPhone()?"「阵容管理 ▾」里":""}填名称后点「保存」。</div>`);
 }
+$("libBond").innerHTML += D.bonds.filter(b => b.name !== "绝技").map(b => `<option>${esc(b.name)}</option>`).join("");
+$("libQ").addEventListener("input", renderLib);
+$("libBond").addEventListener("change", renderLib);
+$("libSeg").addEventListener("click", e => { const b = e.target.closest("[data-lf]"); if (b){ libF = b.dataset.lf; renderLib(); } });
 const openLib = () => { renderLib(); $("lib").style.display = "flex"; };
 const closeLib = () => $("lib").style.display = "none";
 $("btnLib").addEventListener("click", openLib);
@@ -2023,7 +2281,9 @@ $("mnav").addEventListener("click", e => { if (e.target.closest("[data-lib]")) o
 $("libClose").addEventListener("click", closeLib);
 $("lib").addEventListener("click", e => {
   if (e.target.id === "lib") return closeLib();
-  const ld = e.target.closest("[data-lload]"), dl = e.target.closest("[data-ldel]");
+  const ld = e.target.closest("[data-lload]"), dl = e.target.closest("[data-ldel]"), sh = e.target.closest("[data-lshare]"), lr = e.target.closest("[data-lrep]");
+  if (sh){ const L = savedAll()[sh.dataset.lshare]; if (L) shareLineup({...L, name:sh.dataset.lshare}); return; }
+  if (lr){ const k = lr.dataset.lrep; repairAndLoad(savedAll()[k], k); return; }
   if (ld){ const k = ld.dataset.lload; S = normalize(savedAll()[k]); selected = null; refreshSaved(k); render(); closeLib(); if (isPhone()) setView("board"); toast("已载入：" + k); }
   if (dl){ const k = dl.dataset.ldel; if (!confirm(`删除阵容「${k}」？`)) return; const all = savedAll(); delete all[k]; store.set("wsxy-lineups", all); refreshSaved(); renderLib(); toast("已删除"); }
 });
@@ -2054,11 +2314,44 @@ $("fileIn").addEventListener("change", async e => {
   e.target.value = "";
 });
 
+// ===== 分享链接：阵容压缩后放进网址 #s=…（不经过服务器）=====
+const b64u = u8 => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const ub64u = s => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+async function shareCode(L){
+  const bytes = new TextEncoder().encode(JSON.stringify(L));
+  if (window.CompressionStream){ try { const z = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer()); return "z" + b64u(z); } catch(_){} }
+  return "j" + b64u(bytes);
+}
+async function decodeShare(code){
+  let u = ub64u(code.slice(1));
+  if (code[0] === "z") u = new Uint8Array(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+  return JSON.parse(new TextDecoder().decode(u));
+}
+async function shareLineup(L0){
+  const L = normalize(L0); if (!unitsAll(L).length) return toast("阵容是空的");
+  const url = location.origin + location.pathname + "#s=" + await shareCode(L);
+  const title = `卫戍阵容：${L.name || "未命名"}`;
+  if (navigator.share && isPhone()){ try { await navigator.share({title, url}); return; } catch(e){ if (e.name === "AbortError") return; } }
+  try { await navigator.clipboard.writeText(url); toast("分享链接已复制"); } catch(_){ prompt("复制这个链接发给别人：", url); }
+}
+async function openShared(){
+  const m = location.hash.match(/^#s=([jz][\w-]+)/); if (!m) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const L = normalize(await decodeShare(m[1]));
+    if (!confirm(`打开分享的阵容「${L.name || "未命名"}」？\n会替换当前正在编辑的阵容（已保存的不受影响）。`)) return;
+    S = L; selected = null; refreshSaved(); render(); if (isPhone()) setView("board"); toast("已载入分享的阵容，需要的话点保存");
+  } catch(e){ toast("分享链接无法识别"); }
+}
+$("btnShare").addEventListener("click", () => shareLineup(S));
+window.addEventListener("hashchange", openShared);
+
 /* ---------------- init ---------------- */
 S = normalize(store.get("wsxy-current", emptyLineup()));
 refreshSaved();
 renderPool();
 render();
+openShared();
 </script>
 <script>
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
