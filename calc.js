@@ -309,6 +309,7 @@ function sumMods(items){
 }
 function evaluate(u, pos, ctx){
   const o = ctx.OPS[u.name], s = src(u.name);
+  if (o && o.wild) return {error:"占位干员（人选不限）：只计入盟约，不计算输出"};
   if (!s) return {error:"没有该干员的属性数据"};
   const cfg = config(u, o.tier);
   const B = baseStats(s, cfg.e, cfg.lv);

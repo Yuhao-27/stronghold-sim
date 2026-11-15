@@ -44,6 +44,11 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 #poolGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:6px;max-height:calc(100vh - 250px);overflow:auto;padding-right:4px}
 .tile{position:relative;cursor:pointer;text-align:center;border-radius:6px;padding:2px;background:var(--panel2);border:1px solid transparent}
 .tile:hover{border-color:var(--accent)}
+.tile.wild{border:1px dashed #5d7680}
+.fillc{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.fillc button{display:flex;gap:4px;align-items:center;padding:2px 6px 2px 2px;font-size:12px;border-left:3px solid var(--tc)}
+.fillc button img{width:26px;height:26px;border-radius:4px}
+.fillc button.used{opacity:.45}
 .tile img{width:100%;aspect-ratio:1;display:block;border-radius:4px;border-bottom:3px solid var(--tc)}
 .tile .nm{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile .tb{position:absolute;top:2px;left:2px;font-size:10px;padding:0 4px;border-radius:3px;background:var(--tc);color:#111;font-weight:bold}
@@ -262,7 +267,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
       <input type="text" id="q" placeholder="搜索干员名…">
       <div class="tierbar" id="tierbar"></div>
       <select id="bondFilter"><option value="">全部盟约</option></select>
-      <div class="muted" style="font-size:12px">点击加入战场（满了进整备区），也可以拖到任意空位</div>
+      <div class="muted" style="font-size:12px">点击加入战场（满了进整备区），也可以拖到任意空位。选了盟约后，第一格“任意【盟约】”是不指定人选的占位</div>
     </div>
     <div id="poolGrid"></div>
   </section>
@@ -335,8 +340,13 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 "use strict";
 const D = window.DATA;
 const TIERS = ["Ⅰ","Ⅱ","Ⅲ","Ⅳ","Ⅴ","Ⅵ"];
-const TC = {"Ⅰ":"var(--t1)","Ⅱ":"var(--t2)","Ⅲ":"var(--t3)","Ⅳ":"var(--t4)","Ⅴ":"var(--t5)","Ⅵ":"var(--t6)"};
+const TC = {"任意":"var(--muted)","Ⅰ":"var(--t1)","Ⅱ":"var(--t2)","Ⅲ":"var(--t3)","Ⅳ":"var(--t4)","Ⅴ":"var(--t5)","Ⅵ":"var(--t6)"};
 const OPS = {}; D.operators.forEach(o => OPS[o.name] = o);
+// 占位干员：“任意【某盟约】干员”，只计入盟约，不计算属性
+const WILD = b => `任意【${b}】`;
+D.bonds.forEach(b => { if (b.name === "绝技") return; OPS[WILD(b.name)] = {tier:"任意", name:WILD(b.name), bonds:[b.name], trait_type:"占位", wild:b.name,
+  trait:`代表任意一名拥有【${b.name}】盟约的干员：计入盟约人数，不计算属性和输出。拿到具体干员后，在明细里点选或直接拖到这张卡上替换（保留装备和精锐状态）。`}; });
+const isWild = u => !!(u && OPS[u.name] && OPS[u.name].wild);
 const BONDS = {}; D.bonds.forEach(b => BONDS[b.name] = b);
 const EQUIP = {}; D.equipment.forEach(e => EQUIP[e.name] = e);
 const CORE = D.bonds.filter(b => b.category === "核心盟约").map(b => b.name);
@@ -354,7 +364,8 @@ D.bonds.forEach(b => {
 THRESH["绝技"] = [2,5];
 THRESH["独行"] = [1];
 
-const avatar = n => "avatars/" + encodeURIComponent(n) + ".png";
+const wildSvg = b => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="10" fill="#1d2a30"/><rect x="4" y="4" width="92" height="92" rx="8" fill="none" stroke="#5d7680" stroke-width="3" stroke-dasharray="9 6"/><text x="50" y="46" font-size="40" text-anchor="middle" fill="#8a9aa1" font-family="sans-serif">?</text><text x="50" y="${b.length > 3 ? 80 : 82}" font-size="${b.length > 3 ? 17 : 22}" text-anchor="middle" fill="#e6ecee" font-family="sans-serif" font-weight="bold">${b}</text></svg>`);
+const avatar = n => OPS[n] && OPS[n].wild ? wildSvg(OPS[n].wild) : "avatars/" + encodeURIComponent(n) + ".png";
 const bossAvatar = n => "avatars/boss/" + encodeURIComponent(n) + ".png";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function isoBondOf(eqName){
@@ -417,9 +428,10 @@ function compute(){
   D.bonds.forEach(b => res[b.name] = {name:b.name, members:new Map(), count:0, bonus:0, level:0});
   const add = (b, x, isIso) => {
     const r = res[b]; if (!r) return;
-    if (!r.members.has(x.u.name)) r.members.set(x.u.name, {name:x.u.name, iso:isIso, bench:x.zone==="bench"});
-    else if (!isIso) r.members.get(x.u.name).iso = false;
-    if (x.zone==="field") r.members.get(x.u.name).bench = false;
+    const k = isWild(x.u) ? `${x.u.name}#${x.zone}${x.i}` : x.u.name;
+    if (!r.members.has(k)) r.members.set(k, {name:x.u.name, iso:isIso, bench:x.zone==="bench"});
+    else if (!isIso) r.members.get(k).iso = false;
+    if (x.zone==="field") r.members.get(k).bench = false;
   };
   field.forEach(x => { const {base,iso} = unitBonds(x.u); base.forEach(b=>add(b,x,false)); iso.forEach(b=>add(b,x,true)); });
   bench.forEach(x => { const {base,iso} = unitBonds(x.u); base.concat(iso).filter(b=>BENCH_COUNTS.has(b)).forEach(b=>add(b,x,iso.includes(b))); });
@@ -467,7 +479,13 @@ function renderPool(){
   const list = D.operators.filter(o =>
     (!q || o.name.includes(q)) && (!tierOn.size || tierOn.has(o.tier)) && (!bf || o.bonds.includes(bf)));
   $("poolCount").textContent = `${list.length} / ${D.operators.length}`;
-  $("poolGrid").innerHTML = list.map(o => `
+  const w = bf && OPS[WILD(bf)];
+  $("poolGrid").innerHTML = (w ? `
+    <div class="tile wild" draggable="true" data-op="${esc(w.name)}" style="--tc:var(--muted)" title="不指定具体干员，只占一个【${esc(bf)}】名额">
+      <span class="tb">任</span>
+      <img src="${avatar(w.name)}" alt="">
+      <div class="nm">任意【${esc(bf)}】</div>
+    </div>` : "") + list.map(o => `
     <div class="tile ${used.has(o.name)?"used":""}" draggable="true" data-op="${esc(o.name)}" style="--tc:${TC[o.tier]}">
       <span class="tb">${o.tier}</span>
       <img src="${avatar(o.name)}" alt="" loading="lazy">
@@ -476,7 +494,7 @@ function renderPool(){
 }
 function markUsed(){
   const used = new Set([...S.field, ...S.bench].filter(Boolean).map(u=>u.name));
-  document.querySelectorAll("#poolGrid .tile").forEach(t => t.classList.toggle("used", used.has(t.dataset.op)));
+  document.querySelectorAll("#poolGrid .tile:not(.wild)").forEach(t => t.classList.toggle("used", used.has(t.dataset.op)));
 }
 function cardHTML(u, zone, idx, bondState){
   const o = OPS[u.name], {base, iso} = unitBonds(u);
@@ -494,7 +512,7 @@ function cardHTML(u, zone, idx, bondState){
   }
   return `<div class="card ${sel?"sel":""}" draggable="true" style="--tc:${TC[o.tier]}">
     <div class="top"><img class="av" src="${avatar(u.name)}" alt="">
-      <div style="min-width:0"><div class="nm">${esc(u.name)}</div><div class="meta">${o.tier} 阶 · ${esc(o.trait_type||"")}</div>
+      <div style="min-width:0"><div class="nm">${esc(u.name)}</div><div class="meta">${o.wild ? "占位 · 人选不限" : `${o.tier} 阶 · ${esc(o.trait_type||"")}`}</div>
       <div class="ctrl"><button data-act="elite" class="${u.elite?"elite-on":""}" title="切换精锐状态">★精锐</button><button data-act="swap" title="${zone==="field"?"移到整备区":"移到战场"}">${zone==="field"?"↓整备":"↑上场"}</button><button data-act="remove" title="移除">✕</button></div></div></div>
     <div class="chips">${base.map(b=>chip(b,false)).join("")}${iso.map(b=>chip(b,true)).join("")}</div>
     <div class="equips">${eqs}</div>
@@ -550,6 +568,7 @@ function renderDetail(){
   const el = $("detail");
   const u = selected && S[selected.zone][selected.idx];
   if (!u){ el.innerHTML = '<span class="muted">点选一名干员查看特质、装备与属性计算</span>'; return; }
+  if (isWild(u)) return renderWildDetail(el, u);
   const o = OPS[u.name], {base, iso} = unitBonds(u);
   const eqList = u.equips.filter(Boolean).map(e => `<div class="trait"><b>${esc(e)}</b>${isoBondOf(e)?` <span class="note" style="display:inline">同构→【${esc(isoBondOf(e))}】</span>`:""}<div class="muted">${esc(EQUIP[e]?.effect||"")}</div></div>`).join("");
   el.innerHTML = `<div style="display:flex;gap:10px;align-items:center">
@@ -562,6 +581,17 @@ function renderDetail(){
     <div class="calc">${calcHTML(u)}</div>`;
 }
 
+function renderWildDetail(el, u){
+  const b = OPS[u.name].wild;
+  const used = new Set([...S.field, ...S.bench].filter(Boolean).map(x => x.name));
+  const cands = D.operators.filter(o => o.bonds.includes(b)).sort((x,y) => TIERS.indexOf(x.tier) - TIERS.indexOf(y.tier) || used.has(x.name) - used.has(y.name));
+  el.innerHTML = `<div style="display:flex;gap:10px;align-items:center">
+      <img src="${avatar(u.name)}" style="width:64px;height:64px;border-radius:6px">
+      <div><b style="font-size:16px">${esc(u.name)}</b> <span class="muted">占位 · 人选不限</span>
+      <div class="muted" style="font-size:12px;margin-top:4px">计入【${esc(b)}】人数，每个占位算 1 名不同干员；不计算属性和输出，也不参与领袖/回合模拟。</div></div></div>
+    <div class="row"><b>拿到谁就点谁替换</b> <span class="muted" style="font-size:12px">（共 ${cands.length} 名，保留装备和精锐状态；暗的是阵容里已有的）</span>
+      <div class="fillc">${cands.map(o => `<button type="button" data-fill="${esc(o.name)}" class="${used.has(o.name)?"used":""}" style="--tc:${TC[o.tier]}" title="${esc(o.bonds.join("、"))}"><img src="${avatar(o.name)}" alt="">${esc(o.name)}<span class="muted">${o.tier}${o.bonds.length > 1 ? "·" + esc(o.bonds.filter(x => x !== b).join("")) : ""}</span></button>`).join("")}</div></div>`;
+}
 function calcHTML(u){
   const R = CALC.evaluate(u, selected, ctxFor(lastState || compute()));
   if (R.error) return `<h3>属性计算</h3><div class="muted">${esc(R.error)}</div>`;
@@ -912,6 +942,7 @@ const RULES_HTML = `
   <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
+  <li><b>占位干员</b>：干员池按盟约筛选后，第一格“任意【盟约】”可加入阵容，表示“需要一名该盟约干员，具体是谁不重要”。每个占位算 1 名不同干员计入盟约，不计算属性/输出；点它可从候选列表里选具体干员替换，或把干员从池里拖到它上面，装备和精锐状态会保留。</li>
   <li><b>推荐装备</b>（战场下方）：分「长期装备」和「一次性道具」两组。长期装备逐件试给每名场上非治疗干员（有空栏就加，满栏试替换一件，不动变形同构体及其对应装备），按该干员 x 秒平均 DPS 提升排序；卫戍推荐信/多功能补剂按“已激活盟约 +3 层”后全队 DPS 提升选人；已带组合装备一半的提示另一半；变形同构体只在某盟约差 1 人到下一档时推荐。一次性道具：随身身份牌按 +3 层全队收益；简易通讯机/寻呼模块/人事部记录选第一盟约离下一档最近的干员；博士投影选晋升精锐后全队 DPS 涨得最多的；信标选拿掉后掉盟约最少、输出最低的；资金/商店类与携带者无关。可用“商店等级”过滤。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
   <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
@@ -1065,7 +1096,7 @@ function buildReco(state){
       if (!nxt || nxt - n !== 1) return;
       const base = teamAvg(state);
       let best = null;
-      units.filter(x => x.zone === "field").forEach(x => {
+      units.filter(x => x.zone === "field" && !isWild(x.u)).forEach(x => {
         const {base:bb, iso:ii} = unitBonds(x.u);
         if (bb.includes(b) || ii.includes(b)) return;
         const has = x.u.equips.includes(ISO), need = has ? 1 : 2;
@@ -1109,20 +1140,20 @@ function buildReco(state){
   }
   if (T("博士投影")){
     const base = teamAvg(state);
-    const c = units.filter(x => x.zone === "field" && !x.u.elite).map(x => ({x, g:withTemp(() => { S.field[x.i] = {...x.u, elite:true}; }, st => teamAvg(st)) - base}))
+    const c = units.filter(x => x.zone === "field" && !x.u.elite && !isWild(x.u)).map(x => ({x, g:withTemp(() => { S.field[x.i] = {...x.u, elite:true}; }, st => teamAvg(st)) - base}))
       .sort((a,b) => b.g - a.g)[0];
     ot.push(row(eqTag("博士投影"), c ? `${opChip(c.x)}<span class="why">晋升精锐（含【绝技】人数变化）</span>${c.g > 0.5 ? gainTxt(c.g) : ""}` : `<span class="why">场上干员都已精锐</span>`));
   }
   if (T("拟态物质")){
     const ctx = ctxFor(state);
-    const c = units.filter(x => x.zone === "field").map(x => { const R = CALC.evaluate(x.u, {zone:"field", idx:x.i}, ctx); return {x, v:R.error || R.typeN === "heal" ? 0 : R.avg}; }).sort((a,b) => b.v - a.v)[0];
+    const c = units.filter(x => x.zone === "field" && !isWild(x.u)).map(x => { const R = CALC.evaluate(x.u, {zone:"field", idx:x.i}, ctx); return {x, v:R.error || R.typeN === "heal" ? 0 : R.avg}; }).sort((a,b) => b.v - a.v)[0];
     ot.push(row(eqTag("拟态物质"), `${c ? opChip(c.x) : ""}<span class="why">给你已有 ≥2 名同名的干员（再得 1 名）；模拟器不记副本数，图中为当前输出最高者</span>`));
   }
   if (T("信标")){
     const lv0 = levelSum(state), base = teamAvg(state);
-    const c = units.map(x => withTemp(() => { S[x.zone][x.i] = null; }, st => ({x, lose:lv0 - levelSum(st), dps:base - teamAvg(st)})))
+    const c = units.filter(x => !isWild(x.u)).map(x => withTemp(() => { S[x.zone][x.i] = null; }, st => ({x, lose:lv0 - levelSum(st), dps:base - teamAvg(st)})))
       .sort((a,b) => a.lose - b.lose || a.dps - b.dps)[0];
-    ot.push(row(eqTag("信标"), `${opChip(c.x)}<span class="why">该干员会被销毁，换 1 名同阶（${OPS[c.x.u.name].tier}）干员；拿掉它${c.lose ? `掉 ${c.lose} 档盟约` : "不掉盟约档位"}${c.dps > 0.5 ? `、少 ${f0(c.dps)} DPS` : ""}。不能给自编干员</span>`));
+    if (c) ot.push(row(eqTag("信标"), `${opChip(c.x)}<span class="why">该干员会被销毁，换 1 名同阶（${OPS[c.x.u.name].tier}）干员；拿掉它${c.lose ? `掉 ${c.lose} 档盟约` : "不掉盟约档位"}${c.dps > 0.5 ? `、少 ${f0(c.dps)} DPS` : ""}。不能给自编干员</span>`));
   }
   const any = ANY_HOLDER.filter(T);
   if (any.length) ot.push(row(`<span class="it" title="${esc(any.map(n => n + "：" + EQUIP[n].effect).join("\n"))}"><b>${any.join("、")}</b></span>`,
@@ -1145,7 +1176,11 @@ function render(){
 /* ---------------- actions ---------------- */
 function placeNew(name, zone, idx){
   const u = {name, elite:false, equips:[]};
-  if (zone){ S[zone][idx] = u; }
+  if (zone){
+    const old = S[zone][idx];
+    if (isWild(old) && !OPS[name].wild){ u.elite = old.elite; u.equips = old.equips.slice(0, slotCount(name, old.elite)); }
+    S[zone][idx] = u;
+  }
   else {
     let i = S.field.slice(0,fieldCap()).findIndex(x=>!x);
     if (i >= 0) S.field[i] = u;
@@ -1324,6 +1359,8 @@ $("detail").addEventListener("change", e => {
   render();
 });
 $("detail").addEventListener("click", e => {
+  const f = e.target.closest("[data-fill]");
+  if (f && selected){ placeNew(f.dataset.fill, selected.zone, selected.idx); toast(`已替换为：${f.dataset.fill}`); return; }
   const b = e.target.closest("[data-act2]"); if (!b) return;
   const u = selected && S[selected.zone][selected.idx]; if (!u) return;
   if (b.dataset.act2 === "skpReset"){ delete u.skp; render(); }
