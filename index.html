@@ -160,6 +160,29 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 .verdict.ok{background:rgba(8,216,165,.12);border-color:rgba(8,216,165,.5)}
 .verdict.warn{background:rgba(249,169,15,.12);border-color:rgba(249,169,15,.5)}
 .verdict.bad{background:rgba(230,102,102,.13);border-color:rgba(230,102,102,.55)}
+/* 推荐装备 */
+#recoBox h2 .sp{flex:1}
+#recoBox h2 label{font-size:12px;font-weight:normal;display:flex;gap:4px;align-items:center;color:var(--muted)}
+.rgrp{margin:8px 0 4px;font-size:13px;font-weight:bold;display:flex;gap:6px;align-items:baseline}
+.rgrp small{font-weight:normal;color:var(--muted);font-size:11px}
+.rgrp .tag{font-size:11px;padding:0 6px;border-radius:3px;font-weight:normal}
+.rgrp .tag.lt{background:rgba(8,216,165,.18);color:var(--accent);border:1px solid rgba(8,216,165,.45)}
+.rgrp .tag.ot{background:rgba(249,169,15,.15);color:#f9a90f;border:1px solid rgba(249,169,15,.45)}
+.rc{display:grid;grid-template-columns:minmax(120px,190px) 14px minmax(0,1fr);gap:4px 6px;align-items:center;padding:4px 6px;border-radius:6px;font-size:13px}
+.rc:nth-child(odd){background:#121a1d}
+.rc .it{display:flex;gap:4px;align-items:center;min-width:0}
+.rc .it b{min-width:0;overflow-wrap:anywhere}
+.rc .it i{font-style:normal;font-size:10px;padding:0 4px;border-radius:3px;color:#111;font-weight:bold;flex:none}
+.rc .ar{color:var(--muted);text-align:center}
+.rc .who{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:center;min-width:0}
+.rc .op{display:inline-flex;gap:4px;align-items:center;cursor:pointer;white-space:nowrap}
+.rc .op img{width:22px;height:22px;border-radius:4px}
+.rc .op:hover b{color:var(--accent)}
+.rc .why{color:var(--muted);font-size:12px}
+.rc .g{color:var(--accent);white-space:nowrap}
+.rlist.ot .rc .it b{color:#f3c76b}
+.rpick{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 2px;font-size:12px;color:var(--muted)}
+@media (max-width:760px){.rc{grid-template-columns:1fr;gap:2px}.rc .ar{display:none}.rc .who{padding-left:8px}}
 .rtpl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0;font-size:13px}
 .rtpl input[type=search]{flex:1;min-width:120px}
 .radd summary{cursor:pointer;font-size:13px;color:var(--accent);margin:4px 0}
@@ -251,6 +274,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
       <div class="zone-h"><b>整备区</b><span class="muted">【远见】【奇迹】【投资人】干员在整备区也计入盟约</span></div>
       <div class="slots" id="bench"></div>
     </div>
+    <div class="panel" id="recoBox" style="margin-top:12px"></div>
     <div class="panel" id="detail" style="margin-top:12px"><span class="muted">点选一名干员查看特质与装备</span></div>
   </section>
 
@@ -345,7 +369,8 @@ const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 
 const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
 const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
-function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}}; }
+const DEFAULT_RECO = {tier:6, pick:"", all:false};
+function emptyLineup(){ return {name:"", deploy9:false, field:Array(9).fill(null), bench:Array(BENCH_SIZE).fill(null), layers:{}, temp:0, calc:{...DEFAULT_CALC}, boss:{...DEFAULT_BOSS, opts:{}}, round:{...DEFAULT_ROUND, rows:[]}, reco:{...DEFAULT_RECO}}; }
 let S = emptyLineup();
 let selected = null; // {zone, idx}
 const store = {
@@ -358,6 +383,7 @@ function normalize(L){
   n.calc = {...DEFAULT_CALC, ...(L.calc||{})};
   n.boss = {...DEFAULT_BOSS, ...(L.boss||{})}; n.boss.opts = {...(n.boss.opts||{})};
   n.round = {...DEFAULT_ROUND, ...(L.round||{})};
+  n.reco = {...DEFAULT_RECO, ...(L.reco||{})};
   n.round.rows = (n.round.rows||[]).filter(x => x && ENEMIES.enemies[x.name]).map(x => ({name:x.name, n:Math.max(0, +x.n||0), lv:+x.lv||0, hp:x.hp ?? ""}));
   const fix = u => {
     if (!u || !OPS[u.name]) return null;
@@ -886,14 +912,231 @@ const RULES_HTML = `
   <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
+  <li><b>推荐装备</b>（战场下方）：分「长期装备」和「一次性道具」两组。长期装备逐件试给每名场上非治疗干员（有空栏就加，满栏试替换一件，不动变形同构体及其对应装备），按该干员 x 秒平均 DPS 提升排序；卫戍推荐信/多功能补剂按“已激活盟约 +3 层”后全队 DPS 提升选人；已带组合装备一半的提示另一半；变形同构体只在某盟约差 1 人到下一档时推荐。一次性道具：随身身份牌按 +3 层全队收益；简易通讯机/寻呼模块/人事部记录选第一盟约离下一档最近的干员；博士投影选晋升精锐后全队 DPS 涨得最多的；信标选拿掉后掉盟约最少、输出最低的；资金/商店类与携带者无关。可用“商店等级”过滤。</li>
   <li>未计入：领袖轮中随行敌人漏进目标点扣的生命值（漏到 0 会直接失败）、可移动领袖走出火力范围的时间。</li>
   <li>可开关的机制（矩兽是否停止移动、铳的碎铳之簧是否在场、械的冲击之械方向）在面板上勾选；PRTS 未给出数值的（鳍的护盾、茧的闪避）用“额外受伤倍率”自行设定。</li>
 </ul>`;
 
+// ===== 推荐装备 =====
+// 组合装备：半件 → {other, result}
+const COMBO = {};
+D.equipment.forEach(e => { const m = e.effect.match(/若与“(.+?)”同时持有则组合为“(.+?)”/); if (m) COMBO[e.name] = {other:m[1], result:m[2]}; });
+const COMBO_RESULTS = new Set(Object.values(COMBO).map(c => c.result));
+const isOneTime = e => /销毁/.test(e.effect);
+const RULE_LT = new Set(["卫戍推荐信", "多功能补剂", ISO]);   // 长期装备里按规则（非 DPS）推荐的
+const ANY_HOLDER = ["盟约之币","见钱眼开玩偶","驮兽储蓄罐","精打细算玩偶","定期存折","紧急调度券","一次性促销券","投机骰子","人事部文档"];
+const eqTier = n => TIERS[(EQUIP[n]?.tier || 1) - 1];
+const eqTag = n => `<span class="it" title="${esc(EQUIP[n]?.effect || "")}"><i style="background:${TC[eqTier(n)]}">${eqTier(n)}·${EQUIP[n]?.price ?? "?"}</i><b>${esc(n)}</b></span>`;
+let recoCache = {key:"", html:""};
+
+// 全队（不含治疗）平均 DPS
+function teamAvg(state){
+  const ctx = ctxFor(state); let sum = 0;
+  S.field.slice(0, fieldCap()).forEach((u,i) => {
+    if (!u) return;
+    const R = CALC.evaluate(u, {zone:"field", idx:i}, ctx);
+    if (!R.error && R.typeN !== "heal") sum += R.avg;
+  });
+  return sum;
+}
+const levelSum = st => Object.values(st.res).reduce((a,r) => a + r.level, 0);
+// 临时改动阵容 → 重新计算盟约 → 求值 → 还原
+function withTemp(mut, fn){
+  const snap = {field:S.field.slice(), bench:S.bench.slice(), layers:{...S.layers}};
+  try { mut(); return fn(compute()); }
+  finally { S.field = snap.field; S.bench = snap.bench; S.layers = snap.layers; }
+}
+function allUnits(){
+  const out = [];
+  S.field.slice(0, fieldCap()).forEach((u,i) => u && out.push({u, zone:"field", i}));
+  S.bench.forEach((u,i) => u && out.push({u, zone:"bench", i}));
+  return out;
+}
+const freeSlots = u => slotCount(u.name, u.elite) - u.equips.filter(Boolean).length;
+
+// 长期装备：逐件试给每名场上输出干员（有空栏直接加，满栏试替换一件；不替换同构体及其对应装备）
+function recoLongTerm(state, maxTier){
+  const ctx = ctxFor(state);
+  const units = [];
+  S.field.slice(0, fieldCap()).forEach((u,i) => {
+    if (!u) return;
+    const pos = {zone:"field", idx:i}, R = CALC.evaluate(u, pos, ctx);
+    if (R.error || R.typeN === "heal") return;
+    units.push({u, i, pos, base:R.avg});
+  });
+  const items = D.equipment.filter(e => !isOneTime(e) && !COMBO_RESULTS.has(e.name) && !RULE_LT.has(e.name) && e.tier <= maxTier);
+  return items.map(e => {
+    const opts = [];
+    units.forEach(x => {
+      const eq = x.u.equips.filter(Boolean);
+      if (eq.includes(e.name)) return;
+      const hasIso = eq.includes(ISO);
+      const tries = freeSlots(x.u) > 0 ? [{equips:eq.concat(e.name), rep:null}]
+        : eq.map((r,k) => ({equips:eq.map((y,j) => j === k ? e.name : y), rep:r})).filter(t => t.rep !== ISO && !(hasIso && isoBondOf(t.rep)));
+      let best = null;
+      tries.forEach(t => {
+        const R = CALC.evaluate({...x.u, equips:t.equips}, x.pos, ctx);
+        if (R.error) return;
+        const gain = R.avg - x.base;
+        if (!best || gain > best.gain) best = {x, gain, pct:x.base > 0 ? gain / x.base : 0, rep:t.rep};
+      });
+      if (best) opts.push(best);
+    });
+    opts.sort((a,b) => b.gain - a.gain);
+    return {e, opts};
+  });
+}
+
+// 盟约层数类：给携带者的盟约 +add 层后全队 DPS 的变化
+function recoLayers(state, add, activeOnly){
+  const base = teamAvg(state);
+  return allUnits().map(x => {
+    const {base:b0, iso} = unitBonds(x.u);
+    const bs = b0.concat(iso).filter(b => BONDS[b] && (!activeOnly || state.res[b].level > 0));
+    if (!bs.length) return null;
+    const gain = withTemp(() => bs.forEach(b => S.layers[b] = (+S.layers[b] || 0) + add), st => teamAvg(st)) - base;
+    return {x, bs, gain};
+  }).filter(Boolean).sort((a,b) => b.gain - a.gain || b.bs.length - a.bs.length);
+}
+
+// 第一盟约离下一档最近的干员（通讯机 / 寻呼模块 / 人事部记录）
+function recoFirstBond(state){
+  const by = new Map();
+  allUnits().forEach(x => {
+    const b = OPS[x.u.name].bonds[0];
+    if (!b || !BONDS[b] || b === "独行") return;
+    if (!by.has(b)) {
+      const r = state.res[b], n = r.total ?? r.count, nxt = THRESH[b].find(t => t > n);
+      by.set(b, {b, n, nxt, need:nxt ? nxt - n : null, core:CORE.includes(b), ops:[]});
+    }
+    by.get(b).ops.push(x);
+  });
+  return [...by.values()].sort((a,b) => (a.need ?? 99) - (b.need ?? 99) || b.core - a.core || b.n - a.n);
+}
+
+const recoKey = () => JSON.stringify([S.field.slice(0, fieldCap()), S.bench, S.layers, S.temp, S.calc, S.reco, S.deploy9]);
+let recoTimer = null;
+// 阵容变化后稍等再算（几百次求值），不卡拖拽/点击
+function renderReco(){
+  if (recoKey() === recoCache.key) return;
+  clearTimeout(recoTimer);
+  $("recoBox").style.opacity = recoCache.key ? ".55" : "";
+  recoTimer = setTimeout(() => { buildReco(lastState || compute()); $("recoBox").style.opacity = ""; }, recoCache.key ? 80 : 0);
+}
+function buildReco(state){
+  const R0 = S.reco, key = recoKey();
+  const maxTier = +R0.tier || 6;
+  const opChip = (x, extra = "") => `<span class="op" data-rsel="${x.zone}:${x.i}"><img src="${avatar(x.u.name)}" alt=""><b>${esc(x.u.name)}</b>${extra}</span>`;
+  const gainTxt = (g, pct) => `<span class="g">+${f0(g)} DPS${pct ? `（+${Math.round(pct*100)}%）` : ""}</span>`;
+  const row = (item, who) => `<div class="rc">${item}<span class="ar">→</span><span class="who">${who}</span></div>`;
+  const tierSel = `<label>商店等级 ≤ <select data-rk="tier">${[1,2,3,4,5,6].map(t => `<option value="${t}"${t===maxTier?" selected":""}>${TIERS[t-1]}</option>`).join("")}</select></label>`;
+  let html = `<h2>推荐装备 <small>给谁最划算</small><span class="sp"></span>${tierSel}</h2>`;
+  const units = allUnits();
+  if (!units.length){ html += `<div class="muted">先把干员放上战场或整备区。</div>`; recoCache = {key, html}; $("recoBox").innerHTML = html; return; }
+
+  // ---- 长期装备 ----
+  const LT = recoLongTerm(state, maxTier);
+  const ranked = LT.filter(o => o.opts.length && o.opts[0].gain > 0.5).sort((a,b) => b.opts[0].gain - a.opts[0].gain);
+  const showN = R0.all ? ranked.length : 6;
+  const ltRows = ranked.slice(0, showN).map(o => {
+    const [b, c] = o.opts;
+    return row(eqTag(o.e.name), `${opChip({...b.x, zone:"field"})}${gainTxt(b.gain, b.pct)}${b.rep ? `<span class="why">替换「${esc(b.rep)}」</span>` : ""}${c && c.gain > 0.5 ? `<span class="why">次选 ${esc(c.x.u.name)} +${f0(c.gain)}</span>` : ""}`);
+  });
+  // 规则类长期装备
+  const rule = [];
+  const lay = recoLayers(state, 3, true);
+  ["卫戍推荐信", "多功能补剂"].forEach(n => {
+    if (EQUIP[n].tier > maxTier) return;
+    const t = lay[0];
+    if (!t) { rule.push(row(eqTag(n), `<span class="why">场上没有已激活盟约的干员</span>`)); return; }
+    rule.push(row(eqTag(n), `${opChip(t.x)}<span class="why">已激活盟约 ${t.bs.map(b => `【${esc(b)}】`).join("")} 涨层数${t.gain > 0.5 ? `，每 +3 层全队 ` : ""}</span>${t.gain > 0.5 ? gainTxt(t.gain) : `<span class="why">（当前盟约效果不随层数变化）</span>`}`));
+  });
+  // 组合装备：已有半件 → 另一半给同一人
+  units.filter(x => x.zone === "field").forEach(x => x.u.equips.filter(Boolean).forEach(h => {
+    const c = COMBO[h]; if (!c || x.u.equips.includes(c.other) || EQUIP[c.other].tier > maxTier) return;
+    rule.push(row(eqTag(c.other), `${opChip(x)}<span class="why">已带「${esc(h)}」，凑齐组合为「${esc(c.result)}」</span>`));
+  }));
+  // 变形同构体：差 1 人到下一档的盟约
+  if (EQUIP[ISO].tier <= maxTier){
+    const iso = [];
+    Object.entries(D.isomorph).forEach(([eq, b]) => {
+      if (!EQUIP[eq] || EQUIP[eq].tier > maxTier || !BONDS[b]) return;
+      const r = state.res[b], n = r.total ?? r.count, nxt = THRESH[b].find(t => t > n);
+      if (!nxt || nxt - n !== 1) return;
+      const base = teamAvg(state);
+      let best = null;
+      units.filter(x => x.zone === "field").forEach(x => {
+        const {base:bb, iso:ii} = unitBonds(x.u);
+        if (bb.includes(b) || ii.includes(b)) return;
+        const has = x.u.equips.includes(ISO), need = has ? 1 : 2;
+        if (freeSlots(x.u) < need) return;
+        const add = has ? [eq] : [ISO, eq];
+        const g = withTemp(() => { S.field[x.i] = {...x.u, equips:x.u.equips.filter(Boolean).concat(add)}; }, st => teamAvg(st)) - base;
+        if (!best || g > best.g) best = {x, g, has};
+      });
+      if (best) iso.push({eq, b, n, nxt, ...best});
+    });
+    iso.sort((a,b) => b.g - a.g).slice(0, 3).forEach(o => rule.push(row(
+      `<span class="it" title="${esc(EQUIP[ISO].effect)}"><b>${o.has ? "" : "变形同构体 + "}${esc(o.eq)}</b></span>`,
+      `${opChip(o.x)}<span class="why">加入【${esc(o.b)}】${o.n}→${o.nxt} 人${o.n + 1 === THRESH[o.b][0] ? "，激活" : "，进下一档"}</span>${o.g > 0.5 ? gainTxt(o.g) : ""}`)));
+  }
+  html += `<div class="rgrp"><span class="tag lt">长期</span>长期装备 <small>一直带着生效，按该干员 ${S.calc.x}s 平均 DPS 提升排序</small></div><div class="rlist">${ltRows.join("") || `<div class="muted" style="font-size:12px">没有能提升输出的装备（或场上全是治疗）。</div>`}${rule.join("")}</div>`;
+  if (ranked.length > 6) html += `<button type="button" data-rk="all" style="font-size:12px;margin-top:4px">${R0.all ? "收起" : `显示全部 ${ranked.length} 件`}</button>`;
+  // 查某件装备
+  const pickable = LT.filter(o => o.e.tier <= maxTier).sort((a,b) => a.e.tier - b.e.tier || a.e.name.localeCompare(b.e.name, "zh"));
+  const pk = LT.find(o => o.e.name === R0.pick);
+  html += `<div class="rpick">商店里有某件装备？<select data-rk="pick"><option value="">— 选一件看给谁 —</option>${pickable.map(o => `<option${o.e.name===R0.pick?" selected":""}>${esc(o.e.name)}</option>`).join("")}</select></div>`;
+  if (pk) {
+    const top = pk.opts.filter(o => o.gain > 0.5).slice(0, 4);
+    html += `<div class="rlist">${top.length ? top.map(o => row(eqTag(pk.e.name), `${opChip({...o.x, zone:"field"})}${gainTxt(o.gain, o.pct)}${o.rep ? `<span class="why">替换「${esc(o.rep)}」</span>` : ""}`)).join("")
+      : row(eqTag(pk.e.name), `<span class="why">按默认设置不提升输出：生存/控制/功能类，或条件类效果（如“攻击 3 格外目标时”）默认不计——可在干员明细里勾选条件后再看</span>`)}</div>`;
+  }
+
+  // ---- 一次性道具 ----
+  const ot = [];
+  const T = n => EQUIP[n] && EQUIP[n].tier <= maxTier;
+  if (T("随身身份牌")){
+    const l = recoLayers(state, 3, false)[0];
+    ot.push(row(eqTag("随身身份牌"), l ? `${opChip(l.x)}<span class="why">所属盟约 ${l.bs.map(b => `【${esc(b)}】`).join("")} 各 +3 层（进阶 +6）</span>${l.gain > 0.5 ? gainTxt(l.gain) : `<span class="why">（当前不提升输出，选层数收益大的盟约成员）</span>`}` : `<span class="why">—</span>`));
+  }
+  const fb = recoFirstBond(state);
+  const fbNames = ["简易通讯机", "寻呼模块", "人事部记录"].filter(T);
+  if (fbNames.length && fb.length){
+    const a = fb[0], alt = fb[1];
+    const desc = o => o.need ? `第一盟约【${esc(o.b)}】现 ${o.n} 人，差 ${o.need} 人到 ${o.nxt}` : `第一盟约【${esc(o.b)}】已满档`;
+    ot.push(row(`<span class="it"><b>${fbNames.join(" / ")}</b></span>`,
+      `${opChip(a.ops[0])}<span class="why">${desc(a)}${a.ops.length > 1 ? `（${a.ops.slice(1).map(x => esc(x.u.name)).join("、")} 也行）` : ""}</span>${alt ? `<span class="why">次选 ${esc(alt.ops[0].u.name)}：${desc(alt)}</span>` : ""}`));
+  }
+  if (T("博士投影")){
+    const base = teamAvg(state);
+    const c = units.filter(x => x.zone === "field" && !x.u.elite).map(x => ({x, g:withTemp(() => { S.field[x.i] = {...x.u, elite:true}; }, st => teamAvg(st)) - base}))
+      .sort((a,b) => b.g - a.g)[0];
+    ot.push(row(eqTag("博士投影"), c ? `${opChip(c.x)}<span class="why">晋升精锐（含【绝技】人数变化）</span>${c.g > 0.5 ? gainTxt(c.g) : ""}` : `<span class="why">场上干员都已精锐</span>`));
+  }
+  if (T("拟态物质")){
+    const ctx = ctxFor(state);
+    const c = units.filter(x => x.zone === "field").map(x => { const R = CALC.evaluate(x.u, {zone:"field", idx:x.i}, ctx); return {x, v:R.error || R.typeN === "heal" ? 0 : R.avg}; }).sort((a,b) => b.v - a.v)[0];
+    ot.push(row(eqTag("拟态物质"), `${c ? opChip(c.x) : ""}<span class="why">给你已有 ≥2 名同名的干员（再得 1 名）；模拟器不记副本数，图中为当前输出最高者</span>`));
+  }
+  if (T("信标")){
+    const lv0 = levelSum(state), base = teamAvg(state);
+    const c = units.map(x => withTemp(() => { S[x.zone][x.i] = null; }, st => ({x, lose:lv0 - levelSum(st), dps:base - teamAvg(st)})))
+      .sort((a,b) => a.lose - b.lose || a.dps - b.dps)[0];
+    ot.push(row(eqTag("信标"), `${opChip(c.x)}<span class="why">该干员会被销毁，换 1 名同阶（${OPS[c.x.u.name].tier}）干员；拿掉它${c.lose ? `掉 ${c.lose} 档盟约` : "不掉盟约档位"}${c.dps > 0.5 ? `、少 ${f0(c.dps)} DPS` : ""}。不能给自编干员</span>`));
+  }
+  const any = ANY_HOLDER.filter(T);
+  if (any.length) ot.push(row(`<span class="it" title="${esc(any.map(n => n + "：" + EQUIP[n].effect).join("\n"))}"><b>${any.join("、")}</b></span>`,
+    `<span class="why">给任意干员，效果与携带者无关。精打细算玩偶越早越赚；定期存折持有越久越多，晚点再装</span>`));
+  html += `<div class="rgrp" style="margin-top:12px"><span class="tag ot">一次性</span>一次性道具 <small>装备即销毁，效果取决于给谁</small></div><div class="rlist ot">${ot.join("")}</div>`;
+  html += `<div class="muted" style="font-size:11px;margin-top:6px">按当前阵容、层数和「属性 / DPS」里的敌人防御/法抗计算，只看输出；生存类（盾、头盔、急救箱等）不参与排序。</div>`;
+  recoCache = {key, html};
+  $("recoBox").innerHTML = html;
+}
+
 function render(){
   const state = compute();
   lastState = state;
-  renderBoard(state); renderBonds(state); renderLayers(state); renderDps(state); markUsed(); renderDetail();
+  renderBoard(state); renderReco(state); renderBonds(state); renderLayers(state); renderDps(state); markUsed(); renderDetail();
   $("deploy9").checked = S.deploy9;
   $("lineupName").value = S.name;
   autosave();
@@ -1052,6 +1295,16 @@ $("roundBox").addEventListener("change", e => {
   render();
 });
 $("roundBox").addEventListener("input", e => { if (e.target.id === "rq") renderChips(); });
+$("recoBox").addEventListener("change", e => {
+  const k = e.target.dataset.rk; if (!k) return;
+  S.reco[k] = k === "tier" ? +e.target.value : e.target.value; render();
+});
+$("recoBox").addEventListener("click", e => {
+  const b = e.target.closest("[data-rk='all']"); if (b){ S.reco.all = !S.reco.all; render(); return; }
+  const o = e.target.closest("[data-rsel]"); if (!o) return;
+  const [zone, idx] = o.dataset.rsel.split(":"); selected = {zone, idx:+idx}; render();
+  $("detail").scrollIntoView({behavior:"smooth", block:"start"});
+});
 $("dpsTable").addEventListener("click", e => {
   const tr = e.target.closest("[data-sel]"); if (!tr) return;
   selected = {zone:"field", idx:+tr.dataset.sel}; render();
