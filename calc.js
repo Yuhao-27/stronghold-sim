@@ -46,14 +46,16 @@ const STATW = {"攻击力":"atk","生命值":"hp","生命上限":"hp","最大生
 const CONDRE = /时|后|期间|每次|每有|每秒|每击倒|每阻挡|首次|若|当|如果|内|阻挡|被击倒|击倒|叠加/;
 const ANGLE_OK = /^<(战斗中|在场\d+名[^>]*|达到\d+层|首次到达\d+层)>/;
 
-function emptyMods(){ return {atkP:0,atkF:0,hpP:0,hpF:0,defP:0,defF:0,res:0,aspd:0,itv:0,dmg:[],atkMul:1,defIgnP:0,resIgnP:0,defIgnF:0,resIgnF:0,spRegen:0,spCostP:0,initSp:0,extra:[],weak:false,enemyResF:0,enemyDefP:0}; }
+function emptyMods(){ return {atkP:0,atkF:0,hpP:0,hpF:0,defP:0,defF:0,res:0,aspd:0,itv:0,dmg:[],atkMul:1,defIgnP:0,resIgnP:0,defIgnF:0,resIgnF:0,spRegen:0,spCostP:0,initSp:0,extra:[],weak:false,enemyResF:0,enemyDefP:0,dot:[]}; }
 
 /* 解析一段效果文本 → [{mods, cond, skillOnly, desc}]，一个 seg 内的条件项合并为一个开关 */
 function parseSegment(seg, ctx){
   // ctx: {layersOf(name), equipCount}
   let t = seg.replace(/【(?:基础|进阶|基础&进阶)】/g, "");
   const out = [];
-  const push = (m, cond, skillOnly, desc) => out.push({m, cond, skillOnly, desc});
+  const push = (m, cond, skillOnly, desc, defOn) => out.push(defOn ? {m, cond, skillOnly, desc, defOn} : {m, cond, skillOnly, desc});
+  // 「每次攻击时/后 +X，最多叠加 N 次」：打领袖时一直打同一个目标，几秒就叠满，默认按叠满算
+  const atkStack = (idx, cond, st) => cond && st.mul > 1 && /(?:攻击|治疗)(?:时|后)/.test(prefixOf(idx).split(/[，；]/).pop()) ? "stack" : false;
   // 每叠加N层 系数
   let factor = 1, factorDesc = "";
   const fm = t.match(/((?:【[^】]+】)+)(?:盟约)?每叠加(\d+)层/);
@@ -82,7 +84,7 @@ function parseSegment(seg, ctx){
   };
   const stackOf = (idx, len, val) => {
     const after = t.slice(idx+len, idx+len+40);
-    let m = after.match(/^[^，；]*?(?:最多|至多)叠加(\d+)次/) || after.match(/^[^；]*?（最多叠加(\d+)次/) || after.match(/^[^，；]*?最高(\d+)层/);
+    let m = after.match(/^[^，；]*?(?:最多|至多)叠加(\d+)[次层]/) || after.match(/^[^；]*?（最多叠加(\d+)[次层]/) || after.match(/^[^，；]*?最高(\d+)层/);
     if (m) return {mul:+m[1], note:`叠满 ${m[1]} 次`};
     m = after.match(/^[^，；]*?（至多\s*\+?\s*([\d.]+)%?）/);
     if (m && val) return {mul:+m[1]/val, note:`取上限 ${m[1]}`};
@@ -107,7 +109,7 @@ function parseSegment(seg, ctx){
       if (k==="atkB") mm.atkF += val; else if (k==="hpB") mm.hpF += val;
       else if (pct) mm[k+"P"] += val; else mm[k+"F"] += val;
     });
-    push(mm, cond, skillOnlyAt(m.index), `${names.join("、")}${v>=0?"+":""}${Math.round(v*factor*(cond?st.mul:1)*100)/100}${pct?"%":""}${factor!==1?factorDesc:""}${cond&&st.note?"（"+st.note+"）":""}`);
+    push(mm, cond, skillOnlyAt(m.index), `${names.join("、")}${v>=0?"+":""}${Math.round(v*factor*(cond?st.mul:1)*100)/100}${pct?"%":""}${factor!==1?factorDesc:""}${cond&&st.note?"（"+st.note+"）":""}`, atkStack(m.index, cond, st));
   });
   scan(/法术抗性\s*([+\-])\s*([\d.]+)(?!%)/g, m => {
     if (/无视[^，；]{0,8}$/.test(t.slice(0, m.index))) return;
@@ -123,7 +125,7 @@ function parseSegment(seg, ctx){
     const v = (m[1]==="-"?-1:1) * +m[2];
     const cond = isCond(m.index, m[0].length), st = stackOf(m.index, m[0].length, Math.abs(v));
     const mm = emptyMods(); mm.aspd = v*factor*(cond?st.mul:1);
-    push(mm, cond, skillOnlyAt(m.index), `攻速${v>=0?"+":""}${Math.round(mm.aspd*100)/100}${factor!==1?factorDesc:""}${cond&&st.note?"（"+st.note+"）":""}`);
+    push(mm, cond, skillOnlyAt(m.index), `攻速${v>=0?"+":""}${Math.round(mm.aspd*100)/100}${factor!==1?factorDesc:""}${cond&&st.note?"（"+st.note+"）":""}`, atkStack(m.index, cond, st));
   });
   scan(/攻击间隔[^，；。()（）]*?[(（]\s*([+\-]?[\d.]+)\s*s?\s*[)）]/g, m => {
     const mm = emptyMods(); mm.itv = +m[1]; push(mm, isCond(m.index, m[0].length), skillOnlyAt(m.index), `攻击间隔${+m[1]>=0?"+":""}${m[1]}s`);
@@ -156,10 +158,14 @@ function parseSegment(seg, ctx){
   // --- 额外伤害 ---
   const extra = (m, n, pct, type) => {
     const mm = emptyMods(); mm.extra.push({n: n ? toN(n.replace("次","")) : 1, pct:+pct, type: type==="法术"?"magic":type==="真实"?"true":"phys"});
-    push(mm, isCond(m.index, m[0].length) && !/^[^，；]*?(?:每次)?(?:造成伤害|攻击)时\s*$/.test(prefixOf(m.index).split(/[，；]/).pop()), skillOnlyAt(m.index), `每次命中额外 ${mm.extra[0].n}×${pct}% ${type}伤害`);
+    push(mm, isCond(m.index, m[0].length) && !/^[^，；]*?(?:每次)?(?:造成伤害|攻击)时\s*(?:额外)?\s*$/.test(prefixOf(m.index).split(/[，；]/).pop()), skillOnlyAt(m.index), `每次命中额外 ${mm.extra[0].n}×${pct}% ${type}伤害`);
   };
   scan(/(?:额外|附带|附加)(?:造成)?\s*(一次|1次|2次|两次)?\s*(?:相当于)?(?:自身)?攻击力\s*([\d.]+)%\s*的?\s*(法术|物理|真实)伤害/g, m => extra(m, m[1], m[2], m[3]));
   scan(/(?:额外|附带|附加)(?:造成)?\s*(一次|1次|2次|两次)?\s*([\d.]+)%\s*攻击力\s*的?\s*(法术|物理|真实)伤害/g, m => extra(m, m[1], m[2], m[3]));
+  scan(/阻挡[^，；]*期间[，,]?\s*敌人每秒受到相当于(?:自身)?攻击力\s*([\d.]+)%\s*的?\s*(法术|物理|真实)伤害/g, m => {
+    const mm = emptyMods(); mm.dot.push({pct:+m[1], type: m[2]==="法术"?"magic":m[2]==="真实"?"true":"phys"});
+    push(mm, true, false, `阻挡时被阻挡的敌人每秒受到 ${m[1]}% 攻击力${m[2]}伤害`);
+  });
   if (/弱点伤害/.test(t)){ const mm = emptyMods(); mm.weak = true; push(mm, false, false, "伤害转为弱点伤害（取物理/法术较高者）"); }
   return out;
 }
@@ -209,12 +215,13 @@ function unitEffects(u, pos, ctx){
       if (!items.length) return;
       // 范围过滤（盟约）
       if (opts.scope){
-        const sc = opts.scope(segT); if (sc === false) return; if (sc === "cond" || sc === "aura") items.forEach(it => { it.cond = true; if (sc === "aura") it.defOn = true; });
+        const sc = opts.scope(segT); if (sc === false) return;
+        if (sc === "cond" || sc === "aura" || sc === "enemy") items.forEach(it => { it.cond = true; if (sc !== "cond") it.defOn = sc; });
       }
       // 精锐限定
       if (/精锐【/.test(segT) && !u.elite) return;
       const k = `${key}#${si}`;
-      list.push({key:k, src:srcLabel, text:segT.replace(/【(?:基础|进阶|基础&进阶)】/g,""), items, cond: items.some(it=>it.cond), defOn: items.some(it=>it.defOn)});
+      list.push({key:k, src:srcLabel, text:segT.replace(/【(?:基础|进阶|基础&进阶)】/g,""), items, cond: items.some(it=>it.cond), defOn: (items.find(it=>it.defOn)||{}).defOn || false});
     });
   };
   const st = ctx.state.res;
@@ -234,6 +241,7 @@ function unitEffects(u, pos, ctx){
     add("bond:"+b.name, `盟约【${b.name}】`, b.effect, {total:r.total, layers:L, scope: seg => {
       if (/所有干员|所有地面干员/.test(seg) && !/所有【/.test(seg)) return /地面/.test(seg) && ranged ? false : true;
       if (/精锐状态的干员/.test(seg)) return !!u.elite;
+      if (/场上所有敌人/.test(seg)) return "enemy";
       if (member) return true;
       if (zjEnh) return true;
       // 「【X】干员及周围N格的干员」：本工具不知道站位，默认按站在 X 旁边算（可以取消勾选）
@@ -321,7 +329,7 @@ function sumMods(items){
   items.forEach(({it, srcKey}) => {
     const m = it.m;
     ["atkP","atkF","hpP","hpF","defP","defF","res","aspd","itv","defIgnP","resIgnP","defIgnF","resIgnF","spRegen","spCostP","initSp","enemyResF","enemyDefP"].forEach(k => M[k] += m[k]);
-    M.atkMul *= m.atkMul; M.extra.push(...m.extra); M.weak = M.weak || m.weak;
+    M.atkMul *= m.atkMul; M.extra.push(...m.extra); M.dot.push(...(m.dot||[])); M.weak = M.weak || m.weak;
     m.dmg.forEach(v => dmgBySrc[srcKey] = Math.max(dmgBySrc[srcKey]||1, v));
   });
   M.dmgMul = Object.values(dmgBySrc).reduce((a,b)=>a*b, 1);
@@ -354,7 +362,7 @@ function evaluate(u, pos, ctx){
       const items = parseSegment(seg, {layersOf:ctx.layersOf, equipCount:0, skill:true});
       if (!items.length) return;
       // 去掉已由技能参数处理的“攻击力X%的伤害”类（parseSegment 不处理它们，所以无需去重）
-      skillEff.push({key:`skill:${skIdx}#${si}`, src:`技能「${sk.name}」`, text:seg, items, cond:items.some(it=>it.cond)});
+      skillEff.push({key:`skill:${skIdx}#${si}`, src:`技能「${sk.name}」`, text:seg, items, cond:items.some(it=>it.cond), defOn:(items.find(it=>it.defOn)||{}).defOn || false});
     });
   }
   const enabled = (row, it) => {
@@ -398,10 +406,11 @@ function evaluate(u, pos, ctx){
       if (type !== "heal") M.extra.forEach(x => d += x.n * hitDamage(F.atk * x.pct/100, x.type, en, M, false));
       return d * (type==="heal" ? 1 : M.dmgMul) * targets;
     };
-    const r = {N: perHit(Fn, Mn, 100, typeN, aoeN) / Fn.interval, S:0, B:0, C:0};
+    const dot = (F, M) => M.dot.reduce((a, x) => a + hitDamage(F.atk * x.pct/100, x.type, en, M, false), 0) * M.dmgMul;
+    const r = {N: perHit(Fn, Mn, 100, typeN, aoeN) / Fn.interval + dot(Fn, Mn), S:0, B:0, C:0};
     if (SP){
       const tS = Math.min(nT, Math.max(SP.targets, aoeN));
-      r.S = SP.noAttack ? 0 : perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits / Fs.interval;
+      r.S = (SP.noAttack ? 0 : perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits / Fs.interval) + dot(Fs, Ms);
       if (SP.burst) r.B = perHit(Fs, Ms, SP.burst, dmgType(s, SP.burstType||""), SP.burstAll ? nT : 1);
       if (SP.charge) r.C = perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits;
     }
