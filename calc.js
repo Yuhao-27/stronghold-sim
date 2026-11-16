@@ -1,6 +1,6 @@
 "use strict";
 /* ============ 属性 / DPS 计算引擎 ============
-   数据：stats.js（PRTS 原型 / 本体页面的属性、天赋、技能、模组）
+   数据：stats.js（PRTS 干员本体页面的属性、天赋、技能、模组）
    规则：明日方舟通用公式
      攻击力 = (基础 + 固定加成) × (1 + Σ百分比加成) × Π(攻击力提升至X%)
      攻击间隔 = (基础间隔 + 间隔修正) ÷ (攻速/100)，攻速 = 100 + Σ攻速，限制在 10~600
@@ -193,6 +193,10 @@ function parseSkill(sk, rank){
   if (!p.type && /法术伤害/.test(rest)) p.type = "法术";
   if (!p.type && /真实伤害/.test(rest)) p.type = "真实";
   if (!p.type && /物理伤害/.test(rest) && p.hitScale!==100) p.type = "物理";
+  // 停止攻击、改为每 X 秒造成一次伤害（塔露拉「日冕重烈」召唤簇火、隐德来希「绯红壁合」）
+  if (p.noAttack && !/弹药/.test(d) && (m = d.match(/每\s*([\d.]+)\s*秒[^；。]*?攻击力\s*([\d.]+)%\s*的?(?:范围|群体)?(物理|法术|真实)伤害/))){
+    p.period = +m[1]; p.hitScale = +m[2]; p.type = m[3]; p.periodAoe = /范围|群体/.test(m[0]);
+  }
   if (!p.dur || p.dur <= 0){ p.charge = true; }
   if ((m = d.match(/攻击装有\s*(\d+)\s*发弹药/))){
     p.ammo = +m[1]; p.charge = false;
@@ -416,7 +420,8 @@ function evaluate(u, pos, ctx){
     const r = {N: perHit(Fn, Mn, 100, typeN, aoeN) / Fn.interval + dot(Fn, Mn), S:0, B:0, C:0};
     if (SP){
       const tS = Math.min(nT, Math.max(SP.targets, aoeN));
-      r.S = (SP.noAttack ? 0 : perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits / Fs.interval) + dot(Fs, Ms);
+      r.S = (SP.period ? perHit(Fs, Ms, SP.hitScale, typeS, SP.periodAoe ? nT : 1) / SP.period
+        : SP.noAttack ? 0 : perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits / Fs.interval) + dot(Fs, Ms);
       if (SP.burst) r.B = perHit(Fs, Ms, SP.burst, dmgType(s, SP.burstType||""), SP.burstAll ? nT : 1);
       if (SP.charge) r.C = perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits;
     }

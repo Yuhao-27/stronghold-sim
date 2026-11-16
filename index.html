@@ -573,7 +573,7 @@ const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 
 
 /* ---------------- state ---------------- */
 const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
-const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:"", alive:4, mate:100, pre:11};
+const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:"", alive:4, mate:100, pre:0};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
 const DEFAULT_RECO = {tier:6, pick:"", all:false};
 // 阶段：前期 / 过渡 / 终局。正在编辑的阶段放在 field/bench，其余阶段放在 alts[阶段]
@@ -808,7 +808,7 @@ function renderDetail(){
   const eqList = u.equips.filter(Boolean).map(e => `<div class="trait"><b>${esc(e)}</b>${isoBondOf(e)?` <span class="note" style="display:inline">同构→【${esc(isoBondOf(e))}】</span>`:""}<div class="muted">${esc(EQUIP[e]?.effect||"")}</div></div>`).join("");
   el.innerHTML = `<div style="display:flex;gap:10px;align-items:center">
       <img src="${avatar(u.name)}" style="width:64px;height:64px;border-radius:6px;border-bottom:3px solid ${TC[o.tier]}">
-      <div><b style="font-size:16px">${esc(u.name)}</b> <span class="muted">${o.tier} 阶 · ${esc(o.trait_type)}${o.prototype?" · 原型 "+esc(o.prototype):""}</span>
+      <div><b style="font-size:16px">${esc(u.name)}</b> <span class="muted">${o.tier} 阶 · ${esc(o.trait_type)}</span>
       <div class="chips" style="margin-top:4px">${base.map(b=>`<span class="chip ${CORE.includes(b)?"core":""}">${esc(b)}</span>`).join("")}${iso.map(b=>`<span class="chip iso">${esc(b)}（同构）</span>`).join("")}</div></div></div>
     <div class="row"><div class="trait ${u.elite?"":"active"}"><b>普通特质</b><div>${esc(o.trait)}</div></div>
     ${o.trait_elite?`<div class="trait ${u.elite?"active":""}"><b>精锐特质</b><div>${esc(o.trait_elite)}</div></div>`:""}</div>
@@ -882,7 +882,7 @@ function calcHTML(u){
   const typeLbl = t => TYPE_CN[t] || t;
   const healMode = R.typeN === "heal";
   return `<h3>属性计算 <span class="muted" style="font-weight:normal;font-size:12px">${onField?"":"（不在战场上：盟约加成不计入）"}</span></h3>
-    <div style="font-size:12px" class="muted">数据源：<b style="color:var(--text)">${esc(s.page)}</b>${o.prototype?"（原型）":"（本体）"} · ${esc(s.cls||"")}-${esc(s.branch||"")} · ${esc(s.pos||"")}
+    <div style="font-size:12px" class="muted">数据源：<b style="color:var(--text)">${esc(s.page)}</b> · ${esc(s.cls||"")}-${esc(s.branch||"")} · ${esc(s.pos||"")}
       · ${u.elite?"精锐":"初始"}：精英${R.B.e} Lv.${R.B.lv} · 技能 Rank ${R.cfg.sk} · 模组 ${modSel}</div>
     ${R.notes.map(n=>`<div class="note">${esc(n)}</div>`).join("")}
     <div class="big" style="margin:8px 0">
@@ -973,7 +973,7 @@ function bossSim(state, scale = 1, capOverride){
   phases.forEach((p,i) => { const q = st[i]; st.push({def:q.def*(p.defMul||1), res:Math.min(100, q.res+(p.resAdd||0)), mul:q.mul*(p.mul??1)}); });
   const cap = capOverride || Math.max(10, +bs.cap || 600);
   // 回合开始后领袖要过一会儿才出现：这段时间技力照常回复（技能可能已经放了），但伤害只从领袖出现算起
-  const pre = Math.max(0, +(bs.pre ?? 11) || 0);
+  const pre = Math.max(0, +(bs.pre ?? 0) || 0);
   const ctx = {...ctxFor(state), horizon:cap + pre};
   const units = [];
   S.field.slice(0, fieldCap()).forEach((u,i) => {
@@ -1037,7 +1037,7 @@ function renderBoss(state){
     <label>法抗（留空=资料值）<input type="number" min="0" max="100" step="5" data-bs="res" value="${esc(bs.res??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hres:B.res) : ""}"></label>
     <label title="${multi ? "猜测：PRTS 的生命值是 4 人都存活时的数值，每少 1 人减 25%" : "只有联合模拟（标准/险境/绝境/终极）是 4 人一起打"}">存活玩家<select data-bs="alive" ${multi?"":"disabled"}>${[4,3,2,1].map(n => `<option value="${n}"${n === alive ? " selected" : ""}>${n} 人（生命 ×${n*25}%）</option>`).join("")}</select></label>
     <label title="其他存活玩家每人的输出，按你阵容的百分比估算（100 = 和你一样）。队友输出低，就要你补上">队友平均输出（你的 %）<input type="number" min="0" step="10" data-bs="mate" value="${bs.mate ?? 100}" ${multi && alive > 1 ? "" : "disabled"}></label>
-    <label title="回合开始到领袖出现之间的秒数。这段时间技力照常从初始技力回复，伤害从领袖出现才开始算。11 秒来自实测：塔露拉在领袖出现后第 7 秒开技能">领袖出现前（秒）<input type="number" min="0" step="1" data-bs="pre" value="${bs.pre ?? 11}"></label>
+    <label title="回合开始到领袖出现之间的秒数。这段时间技力照常从初始技力回复，伤害从领袖出现才开始算。默认 0：实测塔露拉（初始技力 38、需要 45）在领袖出现后第 7 秒开技能，说明技力从领袖出现时开始回复">领袖出现前（秒）<input type="number" min="0" step="1" data-bs="pre" value="${bs.pre ?? 0}"></label>
     <label>额外受伤倍率 %<input type="number" min="0" step="5" data-bs="extra" value="${bs.extra}"></label>
     <label>模拟上限（秒）<input type="number" min="10" step="60" data-bs="cap" value="${bs.cap}"></label>
     <label title="PRTS：领袖轮作战时长上限 120 秒（所有模式相同）">领袖轮时限（秒）<input type="number" min="1" step="5" data-bs="limit" value="${bs.limit}"></label>
@@ -1200,12 +1200,12 @@ const RULES_HTML = `
 <tr><td>Ⅴ</td><td>精二 1 级</td><td>精二 60 级</td><td>初始无，精锐 1 级</td></tr>
 <tr><td>Ⅵ</td><td>精二 1 级</td><td>精二 60 级</td><td>初始无，精锐 3 级</td></tr></table>
 <ul>
-  <li>数据源：有「原型」的干员用原型页面（如 Pith(卫戍协议)）的属性/天赋/技能/模组，其余用干员本体页面。技能等级与初始无模组取自 PRTS「模拟配置」。</li>
+  <li>数据源：全部用干员本体的 PRTS 页面（属性/天赋/技能/模组）。卫戍协议里的干员用的是本体技能，不是「原型」页面（如 Pith(卫戍协议)）的占位技能。技能等级与初始无模组取自 PRTS「模拟配置」。</li>
   <li>等级属性在该精英阶段 1 级与满级之间线性插值，超出满级按满级算。默认不计信赖加成，可在「属性 / DPS」中开启。</li>
   <li>攻击力 = (基础 + 固定加成) × (1 + Σ百分比加成) × Π(攻击力提升至X%)；攻击间隔 = (基础间隔 + 修正) ÷ (攻速/100)，攻速限制 10~600。</li>
   <li>物理伤害 = max(攻击 − 防御, 5%攻击)，法术伤害 = max(攻击 × (1 − 法抗%), 5%攻击)；“伤害提升至X%”同一来源取最大、不同来源相乘；弱点伤害取物理/法术中较高者。</li>
   <li>DPS 只算直接伤害（含“额外附加X%攻击力伤害”类），不计元素损伤、持续伤害、召唤物、溅射/弹射。</li>
-  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。领袖击杀模拟里有「领袖出现前（秒）」：回合开始后领袖要过一会儿才出现，这段时间技力照常回复，默认 11 秒（实测：塔露拉初始技力 30、需要 48，在领袖出现后第 7 秒开技能）。弹药类技能（如维伊、机械师）持续时间按弹药数 × 攻击间隔估算。</li>
+  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。领袖击杀模拟里有「领袖出现前（秒）」：回合开始后领袖要过一会儿才出现，这段时间技力照常回复，默认 0 秒（实测：塔露拉「日冕重烈」初始技力 38、需要 45，正好在领袖出现后第 7 秒开技能）。像「日冕重烈」这类停止攻击、每 X 秒召唤一次伤害的技能，按每 X 秒一次计算。弹药类技能（如维伊、机械师）持续时间按弹药数 × 攻击间隔估算。</li>
   <li>条件类效果（开启技能时、部署后、叠加、对特定敌人……）默认不计入，在干员明细里勾选即“假设条件已满足”，可叠加的按叠满计算；常驻效果也可取消勾选。</li>
   <li>盟约效果只对战场上的成员生效；【调和】干员享受已激活核心盟约效果；【精准】3 人时扩展到所有远程干员；【绝技】按精锐状态。【灵巧】的攻速光环（【灵巧】干员及周围格子）对不是【灵巧】的战场干员默认也算上，标着「需站在旁边」，没站在旁边就在干员明细里取消勾选。盟约里写「场上所有敌人」的减益（如【奥术】3 人：敌人每次受到伤害法抗 −1，至多 −32）挂在敌人身上，所有战场干员的伤害都吃得到，默认按叠满算（打领袖时几秒就能叠满），标着「敌人减益」。【乌萨斯】6 人的「阻挡敌人期间敌人每秒受到攻击力 X% 法术伤害」是条件项，在阻挡领袖的那名【乌萨斯】干员明细里勾上。技能或天赋里「每次攻击时/后 +X，最多叠加 N 次」的增益，打领袖时一直攻击同一目标，默认按叠满算，标着「按叠满算」。其他位置相关的光环（周围/身前/两侧）用条件开关或手动加成补充。</li>
 </ul>
