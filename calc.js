@@ -443,6 +443,13 @@ function evaluate(u, pos, ctx){
     return {n, s: sk};
   };
   const damageIn = (r, T0, T1) => { const d = damageSplit(r, T0, T1); return d.n + d.s; };
+  // 单次攻击对给定敌人的伤害（不含伤害倍率），用来核对是否破防：物理低于防御时只剩攻击力的 5%
+  const hitInfo = (en, skill) => {
+    const F = skill ? Fs : Fn, M = skill ? Ms : Mn, type = skill ? typeS : typeN;
+    const atk = F.atk * (skill && SP ? SP.hitScale : 100) / 100;
+    const hit = hitDamage(atk, type, en, M, M.weak);
+    return {type, atk, hit, floor: type !== "true" && type !== "heal" && hit <= atk * 0.05 + 1e-6};
+  };
   const en = {def:+ctx.calc.def||0, res:+ctx.calc.res||0};
   const R0 = rates(en, +ctx.calc.targets||1);
   const split = damageSplit(R0, 0, X), total = split.n + split.s;
@@ -450,7 +457,7 @@ function evaluate(u, pos, ctx){
   return {
     cfg, base, B, mod, skIdx, unlocked, sk, SP, eff, skillEff, Mn, Ms, Fn, Fs,
     typeN, typeS, dpsN:R0.N, dpsS:R0.S, burstDmg:R0.B, chargeHit:R0.C, avg: total / X, avgN: split.n / X, avgS: split.s / X, total, totalN: split.n, totalS: split.s, casts, timeline, X,
-    rates, damageIn, damageSplit, segs, imp, heal: typeN === "heal",
+    rates, damageIn, damageSplit, hitInfo, segs, imp, heal: typeN === "heal",
     notes: B.notes.concat(SP && /受击回复/.test(SP.sp) ? ["受击回复技能：不计受击回复，平均值只含普攻"] : [])
                  .concat(SP && /被动/.test(SP.sp) ? ["被动技能：效果已按常驻计入"] : [])
   };
