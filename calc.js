@@ -429,7 +429,7 @@ function evaluate(u, pos, ctx){
   const segs = [], imp = [];
   if (SP && !/被动/.test(SP.sp) && SP.sp){
     const cost = Math.max(1, SP.cost * (1 - Mn.spCostP/100));
-    let sp = Math.min(cost, ctx.spFull ? cost : SP.init + Mn.initSp), t = 0, guard = 0;
+    let sp = Math.min(cost, SP.init + Mn.initSp), t = 0, guard = 0;
     const regen = 1 + Mn.spRegen;
     const isAtk = /攻击回复/.test(SP.sp), isHit = /受击回复/.test(SP.sp);
     while (t < H - 1e-9 && guard++ < 20000){

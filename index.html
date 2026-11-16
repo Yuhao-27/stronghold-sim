@@ -573,7 +573,7 @@ const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 
 
 /* ---------------- state ---------------- */
 const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
-const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:"", alive:4, mate:100, sp0:"full"};
+const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:"", alive:4, mate:100, pre:11};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
 const DEFAULT_RECO = {tier:6, pick:"", all:false};
 // 阶段：前期 / 过渡 / 终局。正在编辑的阶段放在 field/bench，其余阶段放在 alts[阶段]
@@ -972,7 +972,9 @@ function bossSim(state, scale = 1, capOverride){
   const st = [{def:def0, res:res0, mul:mul0}];
   phases.forEach((p,i) => { const q = st[i]; st.push({def:q.def*(p.defMul||1), res:Math.min(100, q.res+(p.resAdd||0)), mul:q.mul*(p.mul??1)}); });
   const cap = capOverride || Math.max(10, +bs.cap || 600);
-  const ctx = {...ctxFor(state), horizon:cap, spFull: bs.sp0 !== "init"};
+  // 回合开始后领袖要过一会儿才出现：这段时间技力照常回复（技能可能已经放了），但伤害只从领袖出现算起
+  const pre = Math.max(0, +(bs.pre ?? 11) || 0);
+  const ctx = {...ctxFor(state), horizon:cap + pre};
   const units = [];
   S.field.slice(0, fieldCap()).forEach((u,i) => {
     if (!u) return;
@@ -982,7 +984,7 @@ function bossSim(state, scale = 1, capOverride){
   });
   let hp = HP, t = 0, k = 0, kill = null, mateDmg = 0; const dt = 0.1, marks = [];
   while (t < cap - 1e-9 && units.length){
-    let step = 0; const part = units.map(x => { const d = x.R.damageSplit(x.rt[k], t, t+dt); d.n *= st[k].mul; d.s *= st[k].mul; step += d.n + d.s; return d; });
+    let step = 0; const part = units.map(x => { const d = x.R.damageSplit(x.rt[k], t + pre, t + pre + dt); d.n *= st[k].mul; d.s *= st[k].mul; step += d.n + d.s; return d; });
     const ms = step * mateK; step += ms;
     const f = step >= hp ? hp / step : 1;
     units.forEach((x,i) => { x.dn += part[i].n*f; x.ds += part[i].s*f; x.dmg = x.dn + x.ds; });
@@ -991,7 +993,7 @@ function bossSim(state, scale = 1, capOverride){
     hp -= step; t += dt;
     while (k < phases.length && hp / HP < phases[k].below){ marks.push({t, label:phases[k].label}); k++; }
   }
-  return {B, HP, HPfull, multi, alive, mate, mateDmg, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
+  return {B, HP, HPfull, pre, multi, alive, mate, mateDmg, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
 }
 // 干员名下面的小字：伤害类型、攻击力、对领袖（初始阶段）每击伤害；物理没破防时提示只剩 5%
 function bossHitLine(R, en){
@@ -1035,7 +1037,7 @@ function renderBoss(state){
     <label>法抗（留空=资料值）<input type="number" min="0" max="100" step="5" data-bs="res" value="${esc(bs.res??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hres:B.res) : ""}"></label>
     <label title="${multi ? "猜测：PRTS 的生命值是 4 人都存活时的数值，每少 1 人减 25%" : "只有联合模拟（标准/险境/绝境/终极）是 4 人一起打"}">存活玩家<select data-bs="alive" ${multi?"":"disabled"}>${[4,3,2,1].map(n => `<option value="${n}"${n === alive ? " selected" : ""}>${n} 人（生命 ×${n*25}%）</option>`).join("")}</select></label>
     <label title="其他存活玩家每人的输出，按你阵容的百分比估算（100 = 和你一样）。队友输出低，就要你补上">队友平均输出（你的 %）<input type="number" min="0" step="10" data-bs="mate" value="${bs.mate ?? 100}" ${multi && alive > 1 ? "" : "disabled"}></label>
-    <label title="领袖轮开始时干员的技力。全满：开场就放技能；按初始技力：从技能的初始技力开始自然回复">开场技力<select data-bs="sp0"><option value="full"${bs.sp0 !== "init" ? " selected" : ""}>全满（开场就放技能）</option><option value="init"${bs.sp0 === "init" ? " selected" : ""}>按初始技力</option></select></label>
+    <label title="回合开始到领袖出现之间的秒数。这段时间技力照常从初始技力回复，伤害从领袖出现才开始算。11 秒来自实测：塔露拉在领袖出现后第 7 秒开技能">领袖出现前（秒）<input type="number" min="0" step="1" data-bs="pre" value="${bs.pre ?? 11}"></label>
     <label>额外受伤倍率 %<input type="number" min="0" step="5" data-bs="extra" value="${bs.extra}"></label>
     <label>模拟上限（秒）<input type="number" min="10" step="60" data-bs="cap" value="${bs.cap}"></label>
     <label title="PRTS：领袖轮作战时长上限 120 秒（所有模式相同）">领袖轮时限（秒）<input type="number" min="1" step="5" data-bs="limit" value="${bs.limit}"></label>
@@ -1072,7 +1074,7 @@ function renderBoss(state){
   const notes = [B.note, R.hidden && B.hiddenNote].filter(Boolean);
   html += `<details style="margin-top:6px"><summary>领袖能力（PRTS）</summary><ul style="font-size:12px">${B.abilities.map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>
     ${notes.length ? `<div class="note" style="margin-top:6px">${notes.map(esc).join("<br>")}</div>` : ""}
-    <div class="muted" style="font-size:12px;margin-top:6px">单体目标、全程可攻击；技能按「开场技力」设置开始，之后按自然回复循环。干员名下是对初始阶段的单次攻击：物理每击 = 攻击 − 防御、法术每击 = 攻击 ×（1 − 法抗%），都至少为攻击力的 5%（游戏的保底伤害），再乘伤害倍率和领袖减伤。领袖减伤只作用于物理/法术伤害；召唤物、护盾、伤害传递、闪避（茧）、无敌/不死与转阶段时间未计入。生命值取自 PRTS「敌方资料」${R.multi ? "（联合模拟按 4 人存活计，少 1 人减 25%，这是推测）" : ""}，防御/法抗取自敌人页面（各难度可能另有加成，可手动覆盖）。</div>`;
+    <div class="muted" style="font-size:12px;margin-top:6px">单体目标、全程可攻击；技能从回合开始按初始技力 + 自然回复循环，「领袖出现前」那几秒的技力也算上，伤害从领袖出现开始计。干员名下是对初始阶段的单次攻击：物理每击 = 攻击 − 防御、法术每击 = 攻击 ×（1 − 法抗%），都至少为攻击力的 5%（游戏的保底伤害），再乘伤害倍率和领袖减伤。领袖减伤只作用于物理/法术伤害；召唤物、护盾、伤害传递、闪避（茧）、无敌/不死与转阶段时间未计入。生命值取自 PRTS「敌方资料」${R.multi ? "（联合模拟按 4 人存活计，少 1 人减 25%，这是推测）" : ""}，防御/法抗取自敌人页面（各难度可能另有加成，可手动覆盖）。</div>`;
   $("bossBox").innerHTML = html;
 }
 
@@ -1203,7 +1205,7 @@ const RULES_HTML = `
   <li>攻击力 = (基础 + 固定加成) × (1 + Σ百分比加成) × Π(攻击力提升至X%)；攻击间隔 = (基础间隔 + 修正) ÷ (攻速/100)，攻速限制 10~600。</li>
   <li>物理伤害 = max(攻击 − 防御, 5%攻击)，法术伤害 = max(攻击 × (1 − 法抗%), 5%攻击)；“伤害提升至X%”同一来源取最大、不同来源相乘；弱点伤害取物理/法术中较高者。</li>
   <li>DPS 只算直接伤害（含“额外附加X%攻击力伤害”类），不计元素损伤、持续伤害、召唤物、溅射/弹射。</li>
-  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。领袖击杀模拟里有「开场技力」设置，默认全满（开场就放技能）。弹药类技能（如维伊、机械师）持续时间按弹药数 × 攻击间隔估算。</li>
+  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。领袖击杀模拟里有「领袖出现前（秒）」：回合开始后领袖要过一会儿才出现，这段时间技力照常回复，默认 11 秒（实测：塔露拉初始技力 30、需要 48，在领袖出现后第 7 秒开技能）。弹药类技能（如维伊、机械师）持续时间按弹药数 × 攻击间隔估算。</li>
   <li>条件类效果（开启技能时、部署后、叠加、对特定敌人……）默认不计入，在干员明细里勾选即“假设条件已满足”，可叠加的按叠满计算；常驻效果也可取消勾选。</li>
   <li>盟约效果只对战场上的成员生效；【调和】干员享受已激活核心盟约效果；【精准】3 人时扩展到所有远程干员；【绝技】按精锐状态。【灵巧】的攻速光环（【灵巧】干员及周围格子）对不是【灵巧】的战场干员默认也算上，标着「需站在旁边」，没站在旁边就在干员明细里取消勾选。盟约里写「场上所有敌人」的减益（如【奥术】3 人：敌人每次受到伤害法抗 −1，至多 −32）挂在敌人身上，所有战场干员的伤害都吃得到，默认按叠满算（打领袖时几秒就能叠满），标着「敌人减益」。【乌萨斯】6 人的「阻挡敌人期间敌人每秒受到攻击力 X% 法术伤害」是条件项，在阻挡领袖的那名【乌萨斯】干员明细里勾上。技能或天赋里「每次攻击时/后 +X，最多叠加 N 次」的增益，打领袖时一直攻击同一目标，默认按叠满算，标着「按叠满算」。其他位置相关的光环（周围/身前/两侧）用条件开关或手动加成补充。</li>
 </ul>
@@ -2158,7 +2160,7 @@ $("bossBox").addEventListener("change", e => {
   if (t.dataset.bopt){ bs.opts[t.dataset.bopt] = t.checked; render(); return; }
   const k = t.dataset.bs; if (!k) return;
   if (k === "hidden") bs.hidden = t.checked;
-  else if (k === "name" || k === "mode" || k === "sp0") bs[k] = t.value;
+  else if (k === "name" || k === "mode") bs[k] = t.value;
   else if (k === "def" || k === "res" || k === "life") bs[k] = t.value === "" ? "" : Math.max(0, +t.value||0);
   else bs[k] = Math.max(0, +t.value||0);
   render();
