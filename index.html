@@ -980,20 +980,39 @@ function bossSim(state, scale = 1, capOverride){
     if (!u) return;
     const R = CALC.evaluate(u, {zone:"field", idx:i}, ctx);
     if (R.error || R.heal) return;
-    units.push({u, R, rt: st.map(s => R.rates({def:s.def, res:s.res}, 1)), dmg:0, dn:0, ds:0});
+    units.push({u, R, rt: st.map(s => R.rates({def:s.def, res:s.res}, 1)), dmg:0, dn:0, ds:0, db:0});
   });
+  // 灼燃：天赋「造成法术伤害时附带 X% 的灼燃损伤」按该干员造成的伤害累积，满 1000 爆发：
+  // 1200 元素伤害 + 法抗 −20 持续 10 秒（爆发期间不再累积）；有「足迹」天赋的再按每 X 秒 Y% 攻击力法术伤害算
+  const BAR = 1000, BURST = 1200, BURST_T = 10, BURST_RES = 20;
+  const burnOn = units.some(x => x.R.burn);
+  const stB = st.map(s => ({def:s.def, res:Math.max(0, s.res - BURST_RES)}));
+  if (burnOn) units.forEach(x => x.rtB = stB.map(s => x.R.rates(s, 1)));
+  let bar = 0, burstEnd = -1, footEnd = -1, bursts = [];
   let hp = HP, t = 0, k = 0, kill = null, mateDmg = 0; const dt = 0.1, marks = [];
   while (t < cap - 1e-9 && units.length){
-    let step = 0; const part = units.map(x => { const d = x.R.damageSplit(x.rt[k], t + pre, t + pre + dt); d.n *= st[k].mul; d.s *= st[k].mul; step += d.n + d.s; return d; });
+    const inB = t < burstEnd;
+    let step = 0; const part = units.map(x => { const d = x.R.damageSplit((inB ? x.rtB : x.rt)[k], t + pre, t + pre + dt); d.n *= st[k].mul; d.s *= st[k].mul; d.b = 0;
+      if (x.R.foot && t < footEnd) d.b += x.R.magicHit(inB ? stB[k] : st[k], x.R.foot.pct, d.s > 0) / x.R.foot.period * dt * st[k].mul;
+      step += d.n + d.s + d.b; return d; });
+    if (burnOn && !inB){
+      units.forEach((x,i) => { if (x.R.burn) bar += x.R.burn/100 * (part[i].n + part[i].s + part[i].b); });
+      if (bar >= BAR){
+        const x = units.find(x => x.R.burn), i = units.indexOf(x);
+        part[i].b += BURST * st[k].mul; step += BURST * st[k].mul;
+        bar = 0; burstEnd = t + dt + BURST_T; bursts.push(t + dt);
+        const fx = units.find(x => x.R.foot); if (fx) footEnd = t + dt + fx.R.foot.win;
+      }
+    }
     const ms = step * mateK; step += ms;
     const f = step >= hp ? hp / step : 1;
-    units.forEach((x,i) => { x.dn += part[i].n*f; x.ds += part[i].s*f; x.dmg = x.dn + x.ds; });
+    units.forEach((x,i) => { x.dn += part[i].n*f; x.ds += part[i].s*f; x.db += part[i].b*f; x.dmg = x.dn + x.ds + x.db; });
     mateDmg += ms * f;
     if (step >= hp){ kill = t + dt*f; hp = 0; break; }
     hp -= step; t += dt;
     while (k < phases.length && hp / HP < phases[k].below){ marks.push({t, label:phases[k].label}); k++; }
   }
-  return {B, HP, HPfull, pre, multi, alive, mate, mateDmg, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
+  return {B, HP, HPfull, pre, bursts, burnOn, multi, alive, mate, mateDmg, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
 }
 // 干员名下面的小字：伤害类型、攻击力、对领袖（初始阶段）每击伤害；物理没破防时提示只剩 5%
 function bossHitLine(R, en){
@@ -1062,15 +1081,17 @@ function renderBoss(state){
       : `${T} 秒内击杀需要${R.mateDmg ? "全队" : ""}平均有效 DPS ≈ <b>${f0(R.HP / T)}</b>；按当前阵容的出伤节奏，${R.mateDmg ? "队友输出不变时，" : ""}需要你的输出达到现在的 <b>×${k.toFixed(2)}</b>${k <= 1 ? `（还有 ${((1/k - 1)*100).toFixed(0)}% 余量）` : `（还差 ${((k - 1)*100).toFixed(0)}%）`}。`;
     html += `<div class="verdict ${V.cls}"><b>${V.head}</b> ${V.text}<div style="margin-top:3px">${need}</div></div>`;
   }
+  if (R.burnOn) html += `<div class="muted" style="font-size:12px">灼燃爆发：${R.bursts.length ? R.bursts.filter(b => R.kill == null || b <= R.kill).map(b => `第 ${b.toFixed(1)} 秒`).join("、") : "未触发"}（每次 1200 元素伤害、法抗 −20 持续 10 秒）</div>`;
   if (R.phases.length) html += `<div class="muted" style="font-size:12px">阶段：${R.phases.map(p => {
       const m = R.marks.find(x => x.label === p.label);
       return `${esc(p.label)} → ${m ? `第 ${m.t.toFixed(1)} 秒触发` : "未触发"}`; }).join("；")}</div>`;
-  const tN = R.units.reduce((a,x) => a + x.dn, 0), tS = R.units.reduce((a,x) => a + x.ds, 0), m0 = R.st[0].mul;
+  const tN = R.units.reduce((a,x) => a + x.dn, 0), tS = R.units.reduce((a,x) => a + x.ds, 0), tB = R.units.reduce((a,x) => a + x.db, 0), m0 = R.st[0].mul;
+  const bc = R.burnOn, bTd = v => bc ? `<td>${v}</td>` : "";
   const pc = v => total ? `<span class="muted"> ${(v/total*100).toFixed(0)}%</span>` : "";
-  html += `<table style="margin-top:6px"><tr><th>干员</th><th>普攻伤害</th><th>技能伤害</th><th>合计</th><th>占比</th><th title="对该领袖（初始阶段）的普攻 DPS">普攻DPS</th><th title="对该领袖（初始阶段）的技能期间 DPS">技能DPS</th></tr>${R.units.map(x =>
-      `<tr><td><img src="${avatar(x.u.name)}">${esc(x.u.name)}${bossHitLine(x.R, R.st[0])}</td><td>${f0(x.dn)}</td><td>${f0(x.ds)}</td><td><b>${f0(x.dmg)}</b></td><td>${total ? (x.dmg/total*100).toFixed(1) : 0}%</td><td>${f0(x.rt[0].N * m0)}</td><td>${skillCell(x.R, x.rt[0].S * m0, x.rt[0].B * m0, x.rt[0].C * m0)}</td></tr>`).join("")}
-    <tr><td><b>${R.mateDmg ? "你的合计" : "合计"}</b></td><td><b>${f0(tN)}</b>${pc(tN)}</td><td><b>${f0(tS)}</b>${pc(tS)}</td><td><b>${f0(total)}</b></td><td colspan="3"></td></tr>
-    ${R.mateDmg ? `<tr><td><b>队友 ×${R.alive - 1}</b><div class="muted" style="font-size:11px">每人按你的 ${f0(R.mate)}% 估算</div></td><td colspan="2"></td><td><b>${f0(R.mateDmg)}</b></td><td>占全队 ${(R.mateDmg/(total + R.mateDmg)*100).toFixed(1)}%</td><td colspan="2"></td></tr>` : ""}</table>`;
+  html += `<table style="margin-top:6px"><tr><th>干员</th><th>普攻伤害</th><th>技能伤害</th>${bc ? `<th title="灼燃爆发的元素伤害 + 爆发后「足迹」的法术伤害">灼燃</th>` : ""}<th>合计</th><th>占比</th><th title="对该领袖（初始阶段）的普攻 DPS">普攻DPS</th><th title="对该领袖（初始阶段）的技能期间 DPS">技能DPS</th></tr>${R.units.map(x =>
+      `<tr><td><img src="${avatar(x.u.name)}">${esc(x.u.name)}${bossHitLine(x.R, R.st[0])}</td><td>${f0(x.dn)}</td><td>${f0(x.ds)}</td>${bTd(x.db ? f0(x.db) : "")}<td><b>${f0(x.dmg)}</b></td><td>${total ? (x.dmg/total*100).toFixed(1) : 0}%</td><td>${f0(x.rt[0].N * m0)}</td><td>${skillCell(x.R, x.rt[0].S * m0, x.rt[0].B * m0, x.rt[0].C * m0)}</td></tr>`).join("")}
+    <tr><td><b>${R.mateDmg ? "你的合计" : "合计"}</b></td><td><b>${f0(tN)}</b>${pc(tN)}</td><td><b>${f0(tS)}</b>${pc(tS)}</td>${bTd(`<b>${f0(tB)}</b>${pc(tB)}`)}<td><b>${f0(total)}</b></td><td colspan="3"></td></tr>
+    ${R.mateDmg ? `<tr><td><b>队友 ×${R.alive - 1}</b><div class="muted" style="font-size:11px">每人按你的 ${f0(R.mate)}% 估算</div></td><td colspan="${bc ? 3 : 2}"></td><td><b>${f0(R.mateDmg)}</b></td><td>占全队 ${(R.mateDmg/(total + R.mateDmg)*100).toFixed(1)}%</td><td colspan="2"></td></tr>` : ""}</table>`;
   const notes = [B.note, R.hidden && B.hiddenNote].filter(Boolean);
   html += `<details style="margin-top:6px"><summary>领袖能力（PRTS）</summary><ul style="font-size:12px">${B.abilities.map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>
     ${notes.length ? `<div class="note" style="margin-top:6px">${notes.map(esc).join("<br>")}</div>` : ""}
@@ -1205,7 +1226,7 @@ const RULES_HTML = `
   <li>攻击力 = (基础 + 固定加成) × (1 + Σ百分比加成) × Π(攻击力提升至X%)；攻击间隔 = (基础间隔 + 修正) ÷ (攻速/100)，攻速限制 10~600。</li>
   <li>物理伤害 = max(攻击 − 防御, 5%攻击)，法术伤害 = max(攻击 × (1 − 法抗%), 5%攻击)；“伤害提升至X%”同一来源取最大、不同来源相乘；弱点伤害取物理/法术中较高者。</li>
   <li>DPS 只算直接伤害（含“额外附加X%攻击力伤害”类），不计元素损伤、持续伤害、召唤物、溅射/弹射。</li>
-  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。领袖击杀模拟里有「领袖出现前（秒）」：回合开始后领袖要过一会儿才出现，这段时间技力照常回复，默认 0 秒（实测：塔露拉「日冕重烈」初始技力 38、需要 45，正好在领袖出现后第 7 秒开技能）。像「日冕重烈」这类停止攻击、每 X 秒召唤一次伤害的技能，按每 X 秒一次计算。弹药类技能（如维伊、机械师）持续时间按弹药数 × 攻击间隔估算。</li>
+  <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。领袖击杀模拟里有「领袖出现前（秒）」：回合开始后领袖要过一会儿才出现，这段时间技力照常回复，默认 0 秒（实测：塔露拉「日冕重烈」初始技力 38、需要 45，正好在领袖出现后第 7 秒开技能）。像「日冕重烈」这类停止攻击、每 X 秒召唤一次伤害的技能，按每 X 秒一次计算。弹药类技能（如维伊、机械师）持续时间按弹药数 × 攻击间隔估算。灼燃（领袖击杀模拟）：天赋写「造成法术伤害时附带 X% 的灼燃损伤」的干员，按自己造成伤害的 X% 累积，满 1000 爆发：1200 元素伤害、法抗 −20 持续 10 秒，爆发期间不累积；塔露拉的「足迹」按爆发后 8 秒内每 0.3 秒 12% 攻击力法术伤害算（假设领袖一直站在足迹上），「停止攻击后法术伤害提升」在技能期间按最高值算。这里用的是普通敌人的灼燃数值，领袖可能有元素抗性，实际可能更低。</li>
   <li>条件类效果（开启技能时、部署后、叠加、对特定敌人……）默认不计入，在干员明细里勾选即“假设条件已满足”，可叠加的按叠满计算；常驻效果也可取消勾选。</li>
   <li>盟约效果只对战场上的成员生效；【调和】干员享受已激活核心盟约效果；【精准】3 人时扩展到所有远程干员；【绝技】按精锐状态。【灵巧】的攻速光环（【灵巧】干员及周围格子）对不是【灵巧】的战场干员默认也算上，标着「需站在旁边」，没站在旁边就在干员明细里取消勾选。盟约里写「场上所有敌人」的减益（如【奥术】3 人：敌人每次受到伤害法抗 −1，至多 −32）挂在敌人身上，所有战场干员的伤害都吃得到，默认按叠满算（打领袖时几秒就能叠满），标着「敌人减益」。【乌萨斯】6 人的「阻挡敌人期间敌人每秒受到攻击力 X% 法术伤害」是条件项，在阻挡领袖的那名【乌萨斯】干员明细里勾上。技能或天赋里「每次攻击时/后 +X，最多叠加 N 次」的增益，打领袖时一直攻击同一目标，默认按叠满算，标着「按叠满算」。其他位置相关的光环（周围/身前/两侧）用条件开关或手动加成补充。</li>
 </ul>

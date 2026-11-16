@@ -307,7 +307,7 @@ function unitEffects(u, pos, ctx){
   });
   Object.values(groups).forEach(t => add("tal:"+t.g, `天赋「${t.name}」`, t.text, {scope: seg => /^(?:自身|在场时)/.test(seg) || !/身后|身前|其余|其他|两侧|周围|相邻/.test(seg) || /自身及/.test(seg) ? true : false}));
   if (modSel && modSel.m.trait) add("modtrait", `模组「${modSel.m.name}」特性`, modSel.m.trait);
-  return {list, notes:[], cls};
+  return {list, notes:[], cls, talText: Object.values(groups).map(t => t.text).join("；")};
 }
 function moduleOf(u, cfg, s){
   if (!cfg.mod || !s.modules.length || cfg.e < 2) return null;
@@ -404,9 +404,17 @@ function evaluate(u, pos, ctx){
   const Fn = final(Mn), Fs = final(Ms);
   if (SP && SP.ammo) SP.dur = SP.ammo * Fs.interval / Math.max(1, SP.hits);
   // 伤害：rates(en, nT) 计算给定敌人防御/法抗/目标数下的各类伤害速率
-  const typeN = dmgType(s, "");
+  // 天赋里的灼燃损伤 / 爆发后足迹 / 停止攻击后法术伤害提升（塔露拉）：只在领袖击杀模拟里按时间推进
+  const talT = (eff && eff.talText) || ""; let tm;
+  const burn = (tm = talT.match(/造成法术伤害时附带\s*([\d.]+)%\s*的?灼燃损伤/)) ? +tm[1] : 0;
+  const foot = (tm = talT.match(/灼燃损伤爆发后\s*(\d+)\s*秒内[^；]*?持续\s*(\d+)\s*秒[^；]*?每\s*([\d.]+)\s*秒造成[^；]*?攻击力\s*([\d.]+)%\s*的?法术伤害/))
+    ? {win: +tm[1] + +tm[2], period: +tm[3], pct: +tm[4]} : null;
+  const idleUp = SP && SP.noAttack && (tm = talT.match(/停止攻击\s*\d+\s*秒后法术(?:和元素)?伤害逐渐提升（最高提升\s*([\d.]+)%/)) ? +tm[1] : 0;
+  // 天赋改伤害类型（塔露拉「绝不妥协」：攻击造成法术伤害）
+  const talType = /攻击造成法术伤害/.test(talT) ? "magic" : /攻击造成真实伤害/.test(talT) ? "true" : "";
+  const typeN = talType && dmgType(s, "") !== "heal" ? talType : dmgType(s, "");
   const aoeTrait = /群体|所有敌人|阻挡的所有敌人|范围内所有/.test(s.trait);
-  const typeS = SP ? (SP.heal ? "heal" : dmgType(s, SP.type)) : typeN;
+  const typeS = SP ? (SP.heal ? "heal" : SP.type ? dmgType(s, SP.type) : typeN) : typeN;
   const rates = (en, nT) => {
     nT = Math.max(1, nT||1);
     const aoeN = aoeTrait ? nT : 1;
@@ -420,7 +428,7 @@ function evaluate(u, pos, ctx){
     const r = {N: perHit(Fn, Mn, 100, typeN, aoeN) / Fn.interval + dot(Fn, Mn), S:0, B:0, C:0};
     if (SP){
       const tS = Math.min(nT, Math.max(SP.targets, aoeN));
-      r.S = (SP.period ? perHit(Fs, Ms, SP.hitScale, typeS, SP.periodAoe ? nT : 1) / SP.period
+      r.S = (SP.period ? perHit(Fs, Ms, SP.hitScale, typeS, SP.periodAoe ? nT : 1) / SP.period * (1 + idleUp/100)
         : SP.noAttack ? 0 : perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits / Fs.interval) + dot(Fs, Ms);
       if (SP.burst) r.B = perHit(Fs, Ms, SP.burst, dmgType(s, SP.burstType||""), SP.burstAll ? nT : 1);
       if (SP.charge) r.C = perHit(Fs, Ms, SP.hitScale, typeS, tS) * SP.hits;
@@ -477,7 +485,8 @@ function evaluate(u, pos, ctx){
   return {
     cfg, base, B, mod, skIdx, unlocked, sk, SP, eff, skillEff, Mn, Ms, Fn, Fs,
     typeN, typeS, dpsN:R0.N, dpsS:R0.S, burstDmg:R0.B, chargeHit:R0.C, avg: total / X, avgN: split.n / X, avgS: split.s / X, total, totalN: split.n, totalS: split.s, casts, timeline, X,
-    rates, damageIn, damageSplit, hitInfo, segs, imp, heal: typeN === "heal",
+    rates, damageIn, damageSplit, hitInfo, segs, imp, heal: typeN === "heal", burn, foot, idleUp,
+    magicHit: (en, pct, skill) => hitDamage((skill ? Fs : Fn).atk * pct/100, "magic", en, skill ? Ms : Mn, false) * (skill ? Ms : Mn).dmgMul * (skill ? 1 + idleUp/100 : 1),
     notes: B.notes.concat(SP && /受击回复/.test(SP.sp) ? ["受击回复技能：不计受击回复，平均值只含普攻"] : [])
                  .concat(SP && /被动/.test(SP.sp) ? ["被动技能：效果已按常驻计入"] : [])
   };
