@@ -859,9 +859,10 @@ function calcHTML(u){
     </div>
     <div style="margin-top:4px"><button data-act2="skpReset" style="font-size:12px">恢复自动解析值</button> <span class="muted" style="font-size:12px">参数由技能描述自动解析，可手动修正</span></div>` : "";
   const effRows = rows => rows.map(r => {
-    const on = r.cond ? (u.conds||{})[r.key] === true : (u.conds||{})[r.key] !== false;
-    return `<div class="effrow ${r.cond?"cond":""} ${on?"":"off"}"><input type="checkbox" data-cond="${esc(r.key)}" data-def="${r.cond?0:1}" ${on?"checked":""}>
-      <div><span class="es">${esc(r.src)}</span>${r.cond?'<span class="tag-c">条件</span>':""} ${esc(r.text)}
+    const defOff = r.cond && !r.defOn;
+    const on = defOff ? (u.conds||{})[r.key] === true : (u.conds||{})[r.key] !== false;
+    return `<div class="effrow ${r.cond?"cond":""} ${on?"":"off"}"><input type="checkbox" data-cond="${esc(r.key)}" data-def="${defOff?0:1}" ${on?"checked":""}>
+      <div><span class="es">${esc(r.src)}</span>${r.defOn?'<span class="tag-c">需站在旁边</span>':r.cond?'<span class="tag-c">条件</span>':""} ${esc(r.text)}
       <div class="ep">${r.items.map(it=>esc(it.desc)+(it.skillOnly?"（技能期间）":"")).join("；")}</div></div></div>`;
   }).join("");
   const mn = u.manual || {};
@@ -883,7 +884,7 @@ function calcHTML(u){
       <tr><td>攻速</td><td>100</td><td>${f0(R.Fn.aspd)}</td><td>${SP?f0(R.Fs.aspd):"—"}</td></tr>
       <tr><td>伤害倍率</td><td>1</td><td>${f2(R.Mn.dmgMul)}</td><td>${SP?f2(R.Ms.dmgMul):"—"}</td></tr></table>
     <h3>技能</h3>${skSel}${skillBox}
-    <h3>加成来源 <span class="muted" style="font-weight:normal;font-size:12px">黄色=条件类效果，勾选即假设条件已满足</span></h3>
+    <h3>加成来源 <span class="muted" style="font-weight:normal;font-size:12px">黄色=条件类效果，勾选即假设条件已满足；「需站在旁边」的默认算上，没站在旁边就取消勾选</span></h3>
     ${effRows(R.eff.list) || '<div class="muted">没有识别到可计算的加成</div>'}
     ${R.skillEff.length?effRows(R.skillEff):""}
     <h3>手动额外加成 <span class="muted" style="font-weight:normal;font-size:12px">其他干员光环、未能自动识别的效果</span></h3>
@@ -1169,7 +1170,7 @@ const RULES_HTML = `
   <li>DPS 只算直接伤害（含“额外附加X%攻击力伤害”类），不计元素损伤、持续伤害、召唤物、溅射/弹射。</li>
   <li>技能：取所选技能对应 Rank 的数值。平均 DPS 模拟 x 秒：技能按初始技力 + 自然回复（自动回复 1/秒 + 技力回复加成；攻击回复 1/次攻击），就绪立即释放，不计其他技力变化（受击回复不回复）。</li>
   <li>条件类效果（开启技能时、部署后、叠加、对特定敌人……）默认不计入，在干员明细里勾选即“假设条件已满足”，可叠加的按叠满计算；常驻效果也可取消勾选。</li>
-  <li>盟约效果只对战场上的成员生效；【调和】干员享受已激活核心盟约效果；【精准】3 人时扩展到所有远程干员；【绝技】按精锐状态。位置相关的光环（周围/身前/两侧）用条件开关或手动加成补充。</li>
+  <li>盟约效果只对战场上的成员生效；【调和】干员享受已激活核心盟约效果；【精准】3 人时扩展到所有远程干员；【绝技】按精锐状态。【灵巧】的攻速光环（【灵巧】干员及周围格子）对不是【灵巧】的战场干员默认也算上，标着「需站在旁边」，没站在旁边就在干员明细里取消勾选。其他位置相关的光环（周围/身前/两侧）用条件开关或手动加成补充。</li>
 </ul>
 <h3>领袖击杀模拟</h3>
 <ul>

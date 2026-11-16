@@ -209,12 +209,12 @@ function unitEffects(u, pos, ctx){
       if (!items.length) return;
       // 范围过滤（盟约）
       if (opts.scope){
-        const sc = opts.scope(segT); if (sc === false) return; if (sc === "cond") items.forEach(it => it.cond = true);
+        const sc = opts.scope(segT); if (sc === false) return; if (sc === "cond" || sc === "aura") items.forEach(it => { it.cond = true; if (sc === "aura") it.defOn = true; });
       }
       // 精锐限定
       if (/精锐【/.test(segT) && !u.elite) return;
       const k = `${key}#${si}`;
-      list.push({key:k, src:srcLabel, text:segT.replace(/【(?:基础|进阶|基础&进阶)】/g,""), items, cond: items.some(it=>it.cond)});
+      list.push({key:k, src:srcLabel, text:segT.replace(/【(?:基础|进阶|基础&进阶)】/g,""), items, cond: items.some(it=>it.cond), defOn: items.some(it=>it.defOn)});
     });
   };
   const st = ctx.state.res;
@@ -236,7 +236,8 @@ function unitEffects(u, pos, ctx){
       if (/精锐状态的干员/.test(seg)) return !!u.elite;
       if (member) return true;
       if (zjEnh) return true;
-      if (/周围\d+格|相邻/.test(seg) && /【[^】]+】干员及/.test(seg)) return "cond";
+      // 「【X】干员及周围N格的干员」：本工具不知道站位，默认按站在 X 旁边算（可以取消勾选）
+      if (/周围\d+格|相邻/.test(seg) && /【[^】]+】干员及/.test(seg)) return "aura";
       return false;
     }});
   });
@@ -358,7 +359,7 @@ function evaluate(u, pos, ctx){
   }
   const enabled = (row, it) => {
     const v = conds[row.key];
-    return it.cond ? v === true : v !== false;
+    return it.cond && !it.defOn ? v === true : v !== false;
   };
   const collect = (rows, skillOn) => {
     const items = [];
