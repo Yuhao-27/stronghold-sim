@@ -194,6 +194,11 @@ function parseSkill(sk, rank){
   if (!p.type && /真实伤害/.test(rest)) p.type = "真实";
   if (!p.type && /物理伤害/.test(rest) && p.hitScale!==100) p.type = "物理";
   if (!p.dur || p.dur <= 0){ p.charge = true; }
+  if ((m = d.match(/攻击装有\s*(\d+)\s*发弹药/))){
+    p.ammo = +m[1]; p.charge = false;
+    // 维伊：储存能量的跳跃伤害只在没有目标时才有，打领袖时就是普通攻击 + 攻速
+    if (/储存的能量/.test(d)){ p.hitScale = 100; p.type = ""; }
+  }
   return p;
 }
 
@@ -393,6 +398,7 @@ function evaluate(u, pos, ctx){
   const Mn = sumMods(collect(eff.list, false).concat(passive ? collect(skillEff, true) : []).concat([manualItem()]));
   const Ms = sumMods(collect(eff.list, true).concat(collect(skillEff, true)).concat([manualItem()]));
   const Fn = final(Mn), Fs = final(Ms);
+  if (SP && SP.ammo) SP.dur = SP.ammo * Fs.interval / Math.max(1, SP.hits);
   // 伤害：rates(en, nT) 计算给定敌人防御/法抗/目标数下的各类伤害速率
   const typeN = dmgType(s, "");
   const aoeTrait = /群体|所有敌人|阻挡的所有敌人|范围内所有/.test(s.trait);
@@ -423,7 +429,7 @@ function evaluate(u, pos, ctx){
   const segs = [], imp = [];
   if (SP && !/被动/.test(SP.sp) && SP.sp){
     const cost = Math.max(1, SP.cost * (1 - Mn.spCostP/100));
-    let sp = Math.min(cost, SP.init + Mn.initSp), t = 0, guard = 0;
+    let sp = Math.min(cost, ctx.spFull ? cost : SP.init + Mn.initSp), t = 0, guard = 0;
     const regen = 1 + Mn.spRegen;
     const isAtk = /攻击回复/.test(SP.sp), isHit = /受击回复/.test(SP.sp);
     while (t < H - 1e-9 && guard++ < 20000){
