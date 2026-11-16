@@ -365,13 +365,18 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   #mnav button b{font-size:18px;line-height:1.1;font-weight:normal}
   #mnav button.on{color:var(--accent)}
   #mnav button i{font-style:normal;font-size:10px;color:var(--accent)}
-  #toast{bottom:calc(84px + env(safe-area-inset-bottom))}
   #modal,#rules,#lib{padding:8px!important}
   #modal .box,#rules .box,#lib .box{max-height:92vh!important}
   #libBody{grid-template-columns:1fr}
   #mnav button{font-size:11px}
 }
+#bkBar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;width:min(560px,calc(100% - 24px));z-index:60;display:none;flex-direction:column;gap:8px;background:#2a1f12;border:1px solid var(--t5);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.5;box-shadow:0 4px 18px #0008}
+#bkBar .bkb{display:flex;gap:8px;justify-content:flex-end}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--accent2);border:1px solid var(--accent);padding:8px 14px;border-radius:8px;display:none;z-index:70}
+/* 手机：提示和备份条放在底部导航上方（要写在上面的基础样式之后才生效） */
+body.bk #toast{bottom:calc(var(--bkh, 120px) + 24px)}
+@media (max-width:760px){#toast{bottom:calc(84px + env(safe-area-inset-bottom))}#bkBar{bottom:calc(72px + env(safe-area-inset-bottom))}
+  body.bk #toast{bottom:calc(var(--bkh, 120px) + 82px + env(safe-area-inset-bottom))}}
 </style>
 </head>
 <body>
@@ -488,6 +493,7 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
 </div></div>
 <div id="tip"></div>
 <div id="toast"></div>
+<div id="bkBar"><div id="bkText"></div><div class="bkb"><button type="button" class="primary" id="bkGo">导出备份</button><button type="button" id="bkLater">过几天再说</button></div></div>
 <nav id="mnav">
   <button data-view="pool"><b>☰</b>干员池</button>
   <button data-view="board"><b>▦</b>阵容<i id="mnavCount"></i></button>
@@ -574,7 +580,7 @@ let S = emptyLineup();
 let selected = null; // {zone, idx}
 const store = {
   get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
-  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch(e){ return false; } }
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){ return false; } if (/^wsxy-(current|lineups|records)$/.test(k)) bkTouch(); return true; }
 };
 function normalize(L){
   const n = emptyLineup();
@@ -1194,6 +1200,7 @@ const RULES_HTML = `
   <li><b>购买清单</b>（战场下方）：列出当前阵容各阶段要买的人，按阶段和阶级排，点一下记为已拿到，顶部显示进度。被禁或要策略才有的人会标出来，并提示可用的备选；勾选只存在这台设备上，「清空本局信息」会一起清掉。</li>
   <li><b>修补</b>：阵容里有人本局拿不到（被禁、要策略）时，在购买清单、阵容库或对局规划「我的阵容本局可用吗」里点「修补」：先换成可用的备选，再按原阵容的盟约档位从可用干员里补人，其他人和位置、装备不动；结果作为当前阵容载入，原阵容不变，会提示哪些盟约档位没保住。</li>
   <li><b>分享</b>：顶部「分享」或阵容库卡片上的「分享」生成链接（阵容压缩在网址里，不经过服务器），对方打开就能载入。「导出 / 导入」是所有阵容的 JSON 备份。</li>
+  <li><b>数据保存与备份</b>：阵容、战绩和设置只存在这台设备的浏览器里，没有云端。清理浏览器数据、换设备，或在 iPhone 上<b>删掉添加到主屏幕的图标</b>，数据都会一起清空（iPhone 主屏幕应用和 Safari 的数据也是分开的）。所以要定期点右上角「导出」：iPhone 上会弹出分享面板，选「存储到文件」；以后点「导入」选这个文件就能恢复。有改动 3 天没导出，底部会出现备份提醒。</li>
   <li><b>搜索与筛选</b>：干员池、装备、阵容库的搜索都支持拼音全拼和首字母（如 fz、fuzou → 复奏）。干员池「更多筛选」可按第二个盟约、特质类型、触发时机筛，或只看本局能拿到的、隐藏阵容里已有的；本局被禁的干员会变暗并标「禁」。阵容库可按本局可用 / 不可用、包含的盟约筛选。</li>
   <li><b>从森空岛导入</b>（战绩 → 从森空岛导入）：森空岛「卫戍协议·规程」页上的历史对局可以导进来。推荐用一键导入：把「卫戍战绩导入」书签拖到书签栏（手机上复制书签代码后新建书签），在森空岛卫戍攻略编辑页登录后点这个书签，就会自动读取战绩并导入。书签只读历史战绩这一份数据，不读账号、密码或登录凭证。书签用不了时可以手动导入：开发者工具（F12 → 网络）里点「导入历史战绩」后找到 history-log 请求，复制它的「响应」粘贴进来。会带上阵容、精锐、装备、结束时的盟约层数、策略、模式、首领（是否击杀）、回合数、击倒数、花费和用时；没有禁用信息。森空岛的自选干员不在本工具的干员表里，只显示名字。编号对照来自 StrongholdAssistant（Apache-2.0）。</li>
   <li><b>对局记录 / 战绩</b>（顶部「战绩」、手机底部「战绩」、对局规划「本局结束 · 记录结果」）：一局打完后点「通关」或「失败」就保存，阵容（终局）、激活的盟约、策略、禁用、模式和首领自动带上，回合数和备注可不填；默认同时清空本局信息，方便下一局。「战绩」页按模式筛选，看总通关率、平均回合、最近 10 局，以及按核心盟约、策略、干员、首领分别统计。记录只存在这台设备上，可用「导出 / 导入」备份或换设备（顶部的导出也会带上记录）。</li>
@@ -2357,10 +2364,51 @@ $("btnDel").addEventListener("click", () => {
   const all = savedAll(); delete all[k]; store.set("wsxy-lineups", all); refreshSaved(); toast("已删除");
 });
 $("btnNew").addEventListener("click", () => { if (!confirm("清空当前阵容？（已保存的不受影响）")) return; S = emptyLineup(); selected=null; render(); });
-$("btnExport").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify({current:S, saved:savedAll(), records:recAll()}, null, 2)], {type:"application/json"});
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "卫戍阵容_" + new Date().toISOString().slice(0,10) + ".json"; a.click(); URL.revokeObjectURL(a.href);
-});
+$("btnExport").addEventListener("click", () => exportAll());
+async function exportAll(){
+  const data = bkData(), name = "卫戍阵容_" + new Date().toISOString().slice(0,10) + ".json";
+  const text = JSON.stringify(data, null, 2);
+  if (isIOS() && navigator.canShare){
+    const file = new File([text], name, {type:"application/json"});
+    if (navigator.canShare({files:[file]})){
+      try { await navigator.share({files:[file]}); bkDone(data); toast("已备份。以后在「文件」App 里找这个文件，点「导入」即可恢复"); }
+      catch(err){ if (err && err.name !== "AbortError") toast("分享失败：" + err.message); }
+      return;
+    }
+  }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], {type:"application/json"})); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  bkDone(data); toast(isIOS() ? "已导出，文件在「文件」App →「下载」里" : "已导出");
+}
+// ===== 备份提醒：数据只存在本机浏览器里，改动 3 天没导出就提醒一次 =====
+const BK_DAYS = 3, DAY = 864e5;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isHomeApp = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+const bkData = () => ({current:S, saved:savedAll(), records:recAll()});
+const bkHash = d => { const t = JSON.stringify(d); let h = 5381; for (let i = 0; i < t.length; i++) h = (h * 33 + t.charCodeAt(i)) | 0; return t.length + ":" + h; };
+const bkGet = () => { try { return JSON.parse(localStorage.getItem("wsxy-backup")) || {}; } catch(e){ return {}; } };
+const bkPut = b => { try { localStorage.setItem("wsxy-backup", JSON.stringify(b)); } catch(e){} };
+const bkHasData = () => Object.keys(savedAll()).length > 0 || recAll().length > 0 || unitsAll(S).length > 0;
+// 启动时 store.set 就会调用它（早于上面的 const），所以只用 localStorage
+function bkTouch(){ try { const b = JSON.parse(localStorage.getItem("wsxy-backup")) || {}; if (!b.since){ b.since = Date.now(); localStorage.setItem("wsxy-backup", JSON.stringify(b)); } } catch(e){} }
+function bkDone(d){ bkPut({hash:bkHash(d), t:Date.now()}); bkCheck(); }
+function bkCheck(){
+  const bar = $("bkBar"), b = bkGet(), now = Date.now();
+  let show = false;
+  if (bkHasData() && bkHash(bkData()) !== b.hash){
+    if (!b.since){ b.since = now; bkPut(b); }
+    show = now - b.since >= BK_DAYS * DAY && now >= (b.snooze || 0);
+  } else if (b.since){ delete b.since; bkPut(b); }
+  document.body.classList.toggle("bk", show);
+  if (!show){ bar.style.display = "none"; return; }
+  const days = Math.floor((now - b.since) / DAY), n = Object.keys(savedAll()).length, r = recAll().length;
+  const what = [n ? `${n} 个阵容` : "", r ? `${r} 局战绩` : ""].filter(Boolean).join("、") || "当前阵容";
+  $("bkText").innerHTML = `<b>该备份了</b>：${esc(what)}有 ${days} 天的改动还没导出。数据只存在这台设备的浏览器里，${isIOS() && isHomeApp() ? "<b>删掉主屏幕图标会一起清空</b>" : "清理浏览器数据或换设备就没了"}。`;
+  bar.style.display = "flex";
+  document.documentElement.style.setProperty("--bkh", bar.offsetHeight + "px");
+}
+$("bkGo").addEventListener("click", () => exportAll());
+$("bkLater").addEventListener("click", () => { const b = bkGet(); b.snooze = Date.now() + BK_DAYS * DAY; bkPut(b); bkCheck(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) bkCheck(); });
 $("btnImport").addEventListener("click", () => $("fileIn").click());
 $("fileIn").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -2704,6 +2752,7 @@ renderPool();
 render();
 openShared();
 skListen();
+bkCheck();
 </script>
 <script>
 if ("serviceWorker" in navigator && location.protocol !== "file:") {
