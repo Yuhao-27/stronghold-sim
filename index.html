@@ -365,8 +365,14 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 400px;gap:12px;paddi
   #mnav button b{font-size:18px;line-height:1.1;font-weight:normal}
   #mnav button.on{color:var(--accent)}
   #mnav button i{font-style:normal;font-size:10px;color:var(--accent)}
-  #modal,#rules,#lib{padding:8px!important}
-  #modal .box,#rules .box,#lib .box{max-height:92vh!important}
+  /* 弹窗避开刘海/状态栏和底部横条，顶端对齐（键盘弹出时标题不被顶走） */
+  #modal,#rules,#lib{padding:8px!important;padding-top:calc(8px + env(safe-area-inset-top))!important;padding-bottom:calc(8px + env(safe-area-inset-bottom))!important;align-items:flex-start!important}
+  #modal .box,#rules .box,#lib .box{max-height:100%!important}
+  /* 选装备的标题栏：标题单独一行，搜索框和按钮在第二行，按钮文字不折行 */
+  #modal .mh{flex-wrap:wrap;gap:6px 8px;padding:10px}
+  #modal #mTitle{flex:1 1 100%;font-size:14px;line-height:1.4}
+  #modal #mQ{min-width:0;font-size:16px}
+  #modal .mh button{white-space:nowrap;flex:none}
   #libBody{grid-template-columns:1fr}
   #mnav button{font-size:11px}
 }
@@ -567,7 +573,7 @@ const slotCount = (name, elite) => name === "“暴躁铁皮”" ? (elite ? 6 : 
 
 /* ---------------- state ---------------- */
 const DEFAULT_CALC = {x:60, def:0, res:0, targets:1, trust:false};
-const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:""};
+const DEFAULT_BOSS = {name:"", mode:"险境模拟", hidden:false, opts:{}, extra:100, def:"", res:"", cap:600, limit:120, life:"", alive:4, mate:100};
 const DEFAULT_ROUND = {r:1, limit:"", scale:100, rows:[], cat:"全部", tg:"", tr:""};
 const DEFAULT_RECO = {tier:6, pick:"", all:false};
 // 阶段：前期 / 过渡 / 终局。正在编辑的阶段放在 field/bench，其余阶段放在 alts[阶段]
@@ -944,12 +950,18 @@ function renderDps(state){
 }
 
 // ===== 领袖击杀模拟 =====
+// 联合模式（4 人）：猜测 PRTS 生命值是 4 人都存活时的数值，每少 1 人减 25%
+const bossMulti = mode => /^(标准|险境|绝境|终极)模拟$/.test(mode || "");
 const fmtT = t => t >= 60 ? `${Math.floor(t/60)}分${(t%60).toFixed(1)}秒` : `${t.toFixed(1)}秒`;
 function bossSim(state, scale = 1, capOverride){
   const bs = S.boss, B = BOSSES.list.find(b => b.name === bs.name); if (!B) return null;
   const hpArr = B.hp[bs.mode] || [];
   const hidden = !!(bs.hidden && hpArr.length > 1);
-  const HP = hidden ? hpArr[1] : hpArr[0];
+  const multi = bossMulti(bs.mode);
+  const alive = multi ? Math.min(4, Math.max(1, Math.round(+bs.alive || 4))) : 1;
+  const mate = multi && alive > 1 ? Math.max(0, +(bs.mate ?? 100) || 0) : 0;
+  const HPfull = hidden ? hpArr[1] : hpArr[0], HP = HPfull * alive / 4 * (multi ? 1 : 4);
+  const mateK = (alive - 1) * mate / 100 / (scale || 1);   // 队友伤害 = 你“原本”的伤害 × 人数 × 比例
   const def0 = bs.def !== "" && bs.def != null ? +bs.def : (hidden ? B.hdef : B.def);
   const res0 = bs.res !== "" && bs.res != null ? +bs.res : (hidden ? B.hres : B.res);
   let mul0 = (+bs.extra || 0) / 100 * scale;
@@ -968,16 +980,18 @@ function bossSim(state, scale = 1, capOverride){
     if (R.error || R.heal) return;
     units.push({u, R, rt: st.map(s => R.rates({def:s.def, res:s.res}, 1)), dmg:0, dn:0, ds:0});
   });
-  let hp = HP, t = 0, k = 0, kill = null; const dt = 0.1, marks = [];
+  let hp = HP, t = 0, k = 0, kill = null, mateDmg = 0; const dt = 0.1, marks = [];
   while (t < cap - 1e-9 && units.length){
     let step = 0; const part = units.map(x => { const d = x.R.damageSplit(x.rt[k], t, t+dt); d.n *= st[k].mul; d.s *= st[k].mul; step += d.n + d.s; return d; });
+    const ms = step * mateK; step += ms;
     const f = step >= hp ? hp / step : 1;
     units.forEach((x,i) => { x.dn += part[i].n*f; x.ds += part[i].s*f; x.dmg = x.dn + x.ds; });
+    mateDmg += ms * f;
     if (step >= hp){ kill = t + dt*f; hp = 0; break; }
     hp -= step; t += dt;
     while (k < phases.length && hp / HP < phases[k].below){ marks.push({t, label:phases[k].label}); k++; }
   }
-  return {B, HP, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
+  return {B, HP, HPfull, multi, alive, mate, mateDmg, hidden, def0, res0, mul0, st, phases, units, kill, hpLeft:hp, cap, marks, opts};
 }
 // 干员名下面的小字：伤害类型、攻击力、对领袖（初始阶段）每击伤害；物理没破防时提示只剩 5%
 function bossHitLine(R, en){
@@ -1013,11 +1027,14 @@ function renderBoss(state){
   const pick = `<div class="bosspick">${BOSSES.list.map(b => `<button type="button" data-bpick="${esc(b.name)}" class="${b.name===bs.name?"on":""}" title="${esc(b.name)}${b.hidden?"（有隐秘核心）":""}"><img src="${bossAvatar(b.name)}" alt=""><span>${esc(b.name)}</span>${b.hidden?"<i>隐</i>":""}</button>`).join("")}</div>`;
   const modeSel = `<select data-bs="mode">${BOSSES.modes.map(m => `<option${m===bs.mode?" selected":""}>${m}</option>`).join("")}</select>`;
   const hasHidden = B && (B.hp[bs.mode]||[]).length > 1;
+  const multi = bossMulti(bs.mode), alive = multi ? Math.min(4, Math.max(1, Math.round(+bs.alive || 4))) : 1;
   let html = pick + `<div class="grid" id="bossSettings">
     <label>难度 / 规程等级${modeSel}</label>
     <label style="flex-direction:row;align-items:center;gap:4px" title="${B && !B.hidden ? "该领袖没有隐秘核心形态" : "隐秘核心仅在险境及以上、规程等级5及以上出现"}"><input type="checkbox" data-bs="hidden" ${bs.hidden?"checked":""} ${hasHidden?"":"disabled"}>隐秘核心</label>
     <label>防御（留空=资料值）<input type="number" min="0" step="50" data-bs="def" value="${esc(bs.def??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hdef:B.def) : ""}"></label>
     <label>法抗（留空=资料值）<input type="number" min="0" max="100" step="5" data-bs="res" value="${esc(bs.res??"")}" placeholder="${B ? (bs.hidden&&hasHidden?B.hres:B.res) : ""}"></label>
+    <label title="${multi ? "猜测：PRTS 的生命值是 4 人都存活时的数值，每少 1 人减 25%" : "只有联合模拟（标准/险境/绝境/终极）是 4 人一起打"}">存活玩家<select data-bs="alive" ${multi?"":"disabled"}>${[4,3,2,1].map(n => `<option value="${n}"${n === alive ? " selected" : ""}>${n} 人（生命 ×${n*25}%）</option>`).join("")}</select></label>
+    <label title="其他存活玩家每人的输出，按你阵容的百分比估算（100 = 和你一样）。队友输出低，就要你补上">队友平均输出（你的 %）<input type="number" min="0" step="10" data-bs="mate" value="${bs.mate ?? 100}" ${multi && alive > 1 ? "" : "disabled"}></label>
     <label>额外受伤倍率 %<input type="number" min="0" step="5" data-bs="extra" value="${bs.extra}"></label>
     <label>模拟上限（秒）<input type="number" min="10" step="60" data-bs="cap" value="${bs.cap}"></label>
     <label title="PRTS：领袖轮作战时长上限 120 秒（所有模式相同）">领袖轮时限（秒）<input type="number" min="1" step="5" data-bs="limit" value="${bs.limit}"></label>
@@ -1031,14 +1048,15 @@ function renderBoss(state){
     ? `<div><b>${fmtT(R.kill)}</b><span>击杀时间</span></div>`
     : `<div><b style="color:#e66">${R.units.length ? `>${R.cap}秒` : "—"}</b><span>${R.units.length ? `未击杀，剩余 ${f0(R.hpLeft)}（${(R.hpLeft/R.HP*100).toFixed(1)}%）` : "场上没有输出干员"}</span></div>`;
   html += `<div class="big" style="margin:8px 0"><img src="${bossAvatar(B.name)}" alt="" style="width:62px;height:62px;border-radius:8px;border:2px solid ${R.hidden?"#ff9a9a":"var(--line)"}">${big}
-    <div><b>${f0(R.HP)}</b><span>生命值${R.hidden?"（隐秘核心）":""}</span></div>
+    <div><b>${f0(R.HP)}</b><span>生命值${R.hidden?"（隐秘核心）":""}${R.multi && R.alive < 4 ? `（${R.alive} 人存活 ×${R.alive*25}%）` : ""}</span></div>
     <div><b>${f0(R.def0)} / ${f0(R.res0)}</b><span>防御 / 法抗</span></div>
-    <div><b>${R.kill ? f0(R.HP / R.kill) : f0(total / R.cap)}</b><span>平均有效 DPS</span></div></div>`;
+    <div><b>${f0(total / (R.kill || R.cap))}</b><span>${R.mateDmg ? "你的" : ""}平均有效 DPS</span></div>
+    ${R.mateDmg ? `<div><b>${f0((total + R.mateDmg) / (R.kill || R.cap))}</b><span>全队（${R.alive} 人）DPS</span></div>` : ""}</div>`;
   const V = bossVerdict(R);
   if (V){
     const T = Math.max(1, +bs.limit || 120), k = bossNeedScale(state, T);
     const need = k == null ? "当前阵容输出太低，无法估算所需倍率。"
-      : `${T} 秒内击杀需要平均有效 DPS ≈ <b>${f0(R.HP / T)}</b>；按当前阵容的出伤节奏，需要输出达到现在的 <b>×${k.toFixed(2)}</b>${k <= 1 ? `（还有 ${((1/k - 1)*100).toFixed(0)}% 余量）` : `（还差 ${((k - 1)*100).toFixed(0)}%）`}。`;
+      : `${T} 秒内击杀需要${R.mateDmg ? "全队" : ""}平均有效 DPS ≈ <b>${f0(R.HP / T)}</b>；按当前阵容的出伤节奏，${R.mateDmg ? "队友输出不变时，" : ""}需要你的输出达到现在的 <b>×${k.toFixed(2)}</b>${k <= 1 ? `（还有 ${((1/k - 1)*100).toFixed(0)}% 余量）` : `（还差 ${((k - 1)*100).toFixed(0)}%）`}。`;
     html += `<div class="verdict ${V.cls}"><b>${V.head}</b> ${V.text}<div style="margin-top:3px">${need}</div></div>`;
   }
   if (R.phases.length) html += `<div class="muted" style="font-size:12px">阶段：${R.phases.map(p => {
@@ -1048,11 +1066,12 @@ function renderBoss(state){
   const pc = v => total ? `<span class="muted"> ${(v/total*100).toFixed(0)}%</span>` : "";
   html += `<table style="margin-top:6px"><tr><th>干员</th><th>普攻伤害</th><th>技能伤害</th><th>合计</th><th>占比</th><th title="对该领袖（初始阶段）的普攻 DPS">普攻DPS</th><th title="对该领袖（初始阶段）的技能期间 DPS">技能DPS</th></tr>${R.units.map(x =>
       `<tr><td><img src="${avatar(x.u.name)}">${esc(x.u.name)}${bossHitLine(x.R, R.st[0])}</td><td>${f0(x.dn)}</td><td>${f0(x.ds)}</td><td><b>${f0(x.dmg)}</b></td><td>${total ? (x.dmg/total*100).toFixed(1) : 0}%</td><td>${f0(x.rt[0].N * m0)}</td><td>${skillCell(x.R, x.rt[0].S * m0, x.rt[0].B * m0, x.rt[0].C * m0)}</td></tr>`).join("")}
-    <tr><td><b>合计</b></td><td><b>${f0(tN)}</b>${pc(tN)}</td><td><b>${f0(tS)}</b>${pc(tS)}</td><td><b>${f0(total)}</b></td><td colspan="3"></td></tr></table>`;
+    <tr><td><b>${R.mateDmg ? "你的合计" : "合计"}</b></td><td><b>${f0(tN)}</b>${pc(tN)}</td><td><b>${f0(tS)}</b>${pc(tS)}</td><td><b>${f0(total)}</b></td><td colspan="3"></td></tr>
+    ${R.mateDmg ? `<tr><td><b>队友 ×${R.alive - 1}</b><div class="muted" style="font-size:11px">每人按你的 ${f0(R.mate)}% 估算</div></td><td colspan="2"></td><td><b>${f0(R.mateDmg)}</b></td><td>占全队 ${(R.mateDmg/(total + R.mateDmg)*100).toFixed(1)}%</td><td colspan="2"></td></tr>` : ""}</table>`;
   const notes = [B.note, R.hidden && B.hiddenNote].filter(Boolean);
   html += `<details style="margin-top:6px"><summary>领袖能力（PRTS）</summary><ul style="font-size:12px">${B.abilities.map(a => `<li>${esc(a)}</li>`).join("")}</ul></details>
     ${notes.length ? `<div class="note" style="margin-top:6px">${notes.map(esc).join("<br>")}</div>` : ""}
-    <div class="muted" style="font-size:12px;margin-top:6px">单体目标、全程可攻击；技能按初始技力 + 自然回复循环。干员名下是对初始阶段的单次攻击：物理每击 = 攻击 − 防御、法术每击 = 攻击 ×（1 − 法抗%），都至少为攻击力的 5%（游戏的保底伤害），再乘伤害倍率和领袖减伤。领袖减伤只作用于物理/法术伤害；召唤物、护盾、伤害传递、闪避（茧）、无敌/不死与转阶段时间未计入。生命值取自 PRTS「敌方资料」，防御/法抗取自敌人页面（各难度可能另有加成，可手动覆盖）。</div>`;
+    <div class="muted" style="font-size:12px;margin-top:6px">单体目标、全程可攻击；技能按初始技力 + 自然回复循环。干员名下是对初始阶段的单次攻击：物理每击 = 攻击 − 防御、法术每击 = 攻击 ×（1 − 法抗%），都至少为攻击力的 5%（游戏的保底伤害），再乘伤害倍率和领袖减伤。领袖减伤只作用于物理/法术伤害；召唤物、护盾、伤害传递、闪避（茧）、无敌/不死与转阶段时间未计入。生命值取自 PRTS「敌方资料」${R.multi ? "（联合模拟按 4 人存活计，少 1 人减 25%，这是推测）" : ""}，防御/法抗取自敌人页面（各难度可能另有加成，可手动覆盖）。</div>`;
   $("bossBox").innerHTML = html;
 }
 
@@ -1192,6 +1211,7 @@ const RULES_HTML = `
   <li>收录 PRTS「敌方资料」中的全部 10 个领袖；假想敌：胄/铳/管/械/茧/鳍 有隐秘核心形态（险境及以上、规程等级 5 及以上，生命值为红色数值）。</li>
   <li>生命值按所选难度/规程等级取表；防御/法抗取自敌人页面级别数据，可手动覆盖。</li>
   <li>按 0.1 秒步长累计全场干员伤害直到领袖生命归零；生命阈值类机制（如萨米的意志 50% 以下减伤 60%、阿利斯泰尔 50% 以下防御翻倍法抗+45、胄 20% 以下减伤 50%）在触发后持续生效。</li>
+  <li><b>联合模拟的人数</b>（推测）：标准/险境/绝境/终极模拟是 4 人一起打同一个领袖。模拟器假设 PRTS 的生命值是 4 人都存活时的数值，每少 1 名存活玩家减 25%。队友的伤害按「队友平均输出（你的 %）」估算：100% 表示每个队友和你打得一样多，这时存活人数不影响击杀时间；队友输出低，剩下的就要你补上，判定里的「需要你的输出达到现在的 ×N」就是在队友输出不变时你要达到的倍率。极速模拟和规程等级是单人模式，不受影响。</li>
   <li><b>能否通过</b>：PRTS 记载领袖轮作战时长上限 120 秒（所有模式相同），计时结束后战斗继续，但每超时 1 秒扣 1 点目标生命值（所有玩家剩余目标生命值合并）。模拟器据此判定：限时内击杀 = 完美；超时秒数 &lt; 剩余目标生命值 = 能过但扣血；否则失败。“需要 ×k 倍”是把全队输出整体放大后二分求出的倍率，考虑了技能节奏和阶段减伤。</li>
   <li><b>回合模拟</b>：回合时限取自 PRTS（1～2 回合 45 秒、3～5 回合 55 秒、6 回合 70 秒、7～8 回合 85 秒、9～10 回合 95 秒、11～13 回合 115 秒）。敌人池为当前赛季「规程」的战术特训敌人（按类别），属性取自敌人页面；2024 模板来自第一期「敌人一览」的回合详情（敌人组与现赛季不同，只作参考）。全队输出按时间分给各种敌人，总用时与时限比较；空中敌人只计远程位干员（及特性写明可远程攻击的近战位）的输出；输出不足时按“先打最快能打死的”估算漏怪数，每只扣 1 点目标生命值（每回合最多 10）。不模拟出怪节奏、走位、阻挡、分路和敌人技能。</li>
   <li><b>简洁 / 完整</b>：战场右上角切换。简洁版只显示头像和盟约汇总（已激活的、差 1~2 人的），点头像回到完整版并打开该干员明细。<b>阵容库</b>（顶部按钮 / 手机底栏）用简洁版列出所有保存的阵容，可直接载入或删除。</li>
@@ -2409,6 +2429,15 @@ function bkCheck(){
 $("bkGo").addEventListener("click", () => exportAll());
 $("bkLater").addEventListener("click", () => { const b = bkGet(); b.snooze = Date.now() + BK_DAYS * DAY; bkPut(b); bkCheck(); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden) bkCheck(); });
+// 手机弹出键盘时 iOS 会把页面往上推，弹窗顶端会跑到状态栏下面；让弹窗始终贴着可见区域
+if (window.visualViewport){
+  const fitModals = () => {
+    const v = visualViewport, phone = matchMedia("(max-width:760px)").matches;
+    ["modal", "rules", "lib"].forEach(id => { const m = $(id); if (!m) return;
+      m.style.top = phone ? v.offsetTop + "px" : ""; m.style.height = phone ? v.height + "px" : ""; m.style.bottom = phone ? "auto" : ""; });
+  };
+  visualViewport.addEventListener("resize", fitModals); visualViewport.addEventListener("scroll", fitModals); fitModals();
+}
 $("btnImport").addEventListener("click", () => $("fileIn").click());
 $("fileIn").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
